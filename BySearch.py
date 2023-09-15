@@ -47,4 +47,4 @@ class BySearch:
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 search = BySearch('C:\\Users\\tihol\\Projects\\PyProjects\\BySearch\\data\\kaggle\\working\\bel_with_embeddings', device)
 
-search.search('аповесць беларускага пісьменніка Уладзіміра Караткевіча, упершыню апублікаваная ў часопісе «Маладосць» у 1964 годзе.')
+search.search('аповесць беларускага пісьменніка Уладзіміра Караткевіча')
