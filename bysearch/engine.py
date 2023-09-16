@@ -14,7 +14,7 @@ class BySearch:
         return model_output.last_hidden_state[:, 0]
     
     
-    def __init__(self, path, device, checkpoint="KoichiYasuoka/roberta-small-belarusian", compute_embeddings=False):
+    def __init__(self, device, dataset=None, path=None, checkpoint="KoichiYasuoka/roberta-small-belarusian", compute_embeddings=False):
         self.device     = device
         self.checkpoint = checkpoint
         self.tokenizer  = AutoTokenizer.from_pretrained(checkpoint)
@@ -22,7 +22,11 @@ class BySearch:
         self.model.to(device)
         
         self.path = path
-        self.database = load_from_disk(path)
+        if dataset is not None:
+            self.database = dataset
+        elif path is not None:
+            self.database = load_from_disk(path)
+        
         if compute_embeddings:
             self.database = self.database.map(
                 lambda x: {"embedding": self.get_embeddings(x["text"]).detach().cpu().numpy()}, 
