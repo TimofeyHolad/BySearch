@@ -1,7 +1,7 @@
 import pandas as pd
 import torch
 from transformers import AutoTokenizer, AutoModel
-from datasets import load_dataset, load_from_disk
+from datasets import load_dataset, load_from_disk, concatenate_datasets
 
 
 class BySearch:
@@ -14,27 +14,39 @@ class BySearch:
         return model_output.last_hidden_state[:, 0]
     
     
-    def __init__(self, device, dataset=None, path=None, checkpoint="KoichiYasuoka/roberta-small-belarusian", compute_embeddings=False):
+    def load_database(self, dataset=None, path=None, compute_embeddings=False):
+        if dataset is not None:
+            database = dataset
+        elif path is not None:
+            database = load_from_disk(path)
+
+        if compute_embeddings:
+            database = database.map(
+                lambda x: {"embedding": self.get_embeddings(x["text"]).detach().cpu().numpy()}, 
+                batched=False, 
+            )
+        return database
+
+
+    def __init__(self, device, dataset=None, path=None, compute_embeddings=False, checkpoint="KoichiYasuoka/roberta-small-belarusian"):
         self.device     = device
         self.checkpoint = checkpoint
         self.tokenizer  = AutoTokenizer.from_pretrained(checkpoint)
         self.model      = AutoModel.from_pretrained(checkpoint)
         self.model.to(device)
         
-        self.path = path
-        if dataset is not None:
-            self.database = dataset
-        elif path is not None:
-            self.database = load_from_disk(path)
-        
-        if compute_embeddings:
-            self.database = self.database.map(
-                lambda x: {"embedding": self.get_embeddings(x["text"]).detach().cpu().numpy()}, 
-                batched=True, 
-            )
+        self.database = self.load_database(dataset, path, compute_embeddings)
         self.database.add_faiss_index('embedding')
         
-    
+
+    def add_data(self, dataset=None, path=None, compute_embeddings=False):
+        additional_database = self.load_database(dataset, path, compute_embeddings)
+        print(additional_database.features)
+        print(self.database.features)
+        self.database = concatenate_datasets([self.database, additional_database])
+        self.database.add_faiss_index('embedding')
+
+
     def search(self, prompt):
         embedding = self.get_embeddings([prompt]).detach().cpu().numpy()
         scores, samples = self.database.get_nearest_examples('embedding', embedding, k=5)
