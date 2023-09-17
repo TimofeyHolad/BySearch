@@ -23,7 +23,8 @@ class BySearch:
         if compute_embeddings:
             database = database.map(
                 lambda x: {"embedding": self.get_embeddings(x["text"]).detach().cpu().numpy()}, 
-                batched=False, 
+                batched=True,
+                batch_size=2, 
             )
         return database
 
@@ -41,8 +42,6 @@ class BySearch:
 
     def add_data(self, dataset=None, path=None, compute_embeddings=False):
         additional_database = self.load_database(dataset, path, compute_embeddings)
-        print(additional_database.features)
-        print(self.database.features)
         self.database = concatenate_datasets([self.database, additional_database])
         self.database.add_faiss_index('embedding')
 
@@ -54,7 +53,7 @@ class BySearch:
         results_df['scores'] = scores
         results_df.sort_values('scores', ascending=False, inplace=True)
         for _, row in results_df.iterrows():
+            print(148 * '-')
             print(f'Scores: {row.scores}')
             print(f'URL: {row.url}')
             print(f'Text: {row.text}')
-            print(148 * '-')
