@@ -14,7 +14,7 @@ class BySearch:
         return model_output.last_hidden_state[:, 0]
     
     
-    def load_database(self, dataset=None, path=None, compute_embeddings=False):
+    def load_database(self, dataset=None, path=None, compute_embeddings=False, batch_size=1):
         if dataset is not None:
             database = dataset
         elif path is not None:
@@ -24,7 +24,7 @@ class BySearch:
             database = database.map(
                 lambda x: {"embedding": self.get_embeddings(x["text"]).detach().cpu().numpy()}, 
                 batched=True,
-                batch_size=2, 
+                batch_size=batch_size, 
             )
         return database
 
