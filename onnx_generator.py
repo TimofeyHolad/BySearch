@@ -1,23 +1,28 @@
+import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModel
-from transformers.onnx import FeaturesManager, export
+from onnxruntime import InferenceSession
 
 checkpoint = 'KoichiYasuoka/roberta-small-belarusian'
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 model = AutoModel.from_pretrained(checkpoint)
 
-input = tokenizer('аповесць беларускага пісьменніка Уладзіміра Караткевіча', return_tensors='pt')
+input = tokenizer('аповесць беларускага пісьменніка Уладзіміра Караткевіча', return_tensors='pt', return_token_type_ids=False)
+torch_output = model(**input)
 
-rez = torch.onnx.export(
+torch.onnx.export(
     model=model,
     args=tuple(input.values()),
     f='by-model.onnx',
-    input_names=['input_ids', 'token_type_ids', 'attention_mask'],
-    output_names=['last_hidden_state'],
-    dynamic_axes={'input_ids': {0: 'batch_size', 1: 'sequence'},
-                  'token_type_ids': {0: 'batch_size', 1: 'sequence'},
-                  'attention_mask': {0: 'batch_size', 1: 'sequence'},
-                  'last_hidden_state': {0: 'batch_size', 1: 'sequence'}},
+    input_names=list(input.keys()),
+    output_names=list(torch_output.keys()),
+    do_constant_folding=True,
     opset_version=13,
 )
-print(rez)
+
+session = InferenceSession('by-model.onnx', providers=['CPUExecutionProvider'])
+onnx_output = session.run(
+    None,
+    {k: v.numpy() for k, v in input.items()},
+)
+print(np.abs(np.max(torch_output[0].detach().numpy() - onnx_output[0])))
