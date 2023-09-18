@@ -1,7 +1,7 @@
 import pandas as pd
 import torch
 from transformers import AutoTokenizer, AutoModel
-from datasets import load_dataset, load_from_disk, concatenate_datasets
+from datasets import load_from_disk, concatenate_datasets
 
 
 class BySearch:
