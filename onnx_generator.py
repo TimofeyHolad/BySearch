@@ -7,7 +7,6 @@ tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 model = AutoModel.from_pretrained(checkpoint)
 
 input = tokenizer('аповесць беларускага пісьменніка Уладзіміра Караткевіча', return_tensors='pt')
-print(tuple(input.values()))
 
 rez = torch.onnx.export(
     model=model,
@@ -19,7 +18,6 @@ rez = torch.onnx.export(
                   'token_type_ids': {0: 'batch_size', 1: 'sequence'},
                   'attention_mask': {0: 'batch_size', 1: 'sequence'},
                   'last_hidden_state': {0: 'batch_size', 1: 'sequence'}},
-    do_constant_folding=True,
     opset_version=13,
 )
 print(rez)
