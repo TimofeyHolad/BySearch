@@ -30,9 +30,9 @@ class BySearch:
         return database
 
 
-    def __init__(self, dataset=None, path=None, compute_embeddings=False, tokenizer_checkpoint="KoichiYasuoka/roberta-small-belarusian", model_path='C:\\Users\\tihol\\Projects\\PyProjects\\BySearch\\by-model.onnx'):
+    def __init__(self, dataset=None, path=None, compute_embeddings=False, tokenizer_checkpoint="KoichiYasuoka/roberta-small-belarusian", model_path='onnx\\by-model.onnx'):
         self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
-        self.session = ort.InferenceSession(model_path, providers=['CUDAExecutionProvider'])
+        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
         
         self.database = self.load_database(dataset, path, compute_embeddings)
         self.database.add_faiss_index('embedding')
