@@ -8,14 +8,14 @@ import onnxruntime as ort
 class BySearch:
     def get_embeddings(self, text_list):
         encoded_input = self.tokenizer(
-            text_list, padding=True, truncation=True, return_tensors="np", max_length=64, return_token_type_ids=False,
+            text_list, padding='max_length', truncation=True, return_tensors="np", max_length=64, return_token_type_ids=False,
         )
         encoded_input = {k: v.astype(dtype=np.int64) for k, v in encoded_input.items()}
-        model_output = self.session.run(output_names=['last_hidden_state'], input_feed=dict(encoded_input))
+        model_output = self.session.run(None, input_feed=dict(encoded_input))
         return model_output[0][:, 0]
     
     
-    def load_database(self, dataset=None, path=None, compute_embeddings=False, batch_size=1):
+    def load_database(self, dataset=None, path=None, compute_embeddings=False, batch_size=2):
         if dataset is not None:
             database = dataset
         elif path is not None:
