@@ -1,20 +1,20 @@
 import pandas as pd
-import torch
+import numpy as np
 from transformers import AutoTokenizer, AutoModel
 from datasets import load_from_disk, concatenate_datasets
-
+import onnxruntime as ort
 
 class BySearch:
     def get_embeddings(self, text_list):
         encoded_input = self.tokenizer(
-            text_list, padding=True, truncation=True, return_tensors="pt", max_length=64,
+            text_list, padding='max_length', truncation=True, return_tensors="np", max_length=64, return_token_type_ids=False,
         )
-        encoded_input = {k: v.to(self.device) for k, v in encoded_input.items()}
-        model_output = self.model(**encoded_input)
-        return model_output.last_hidden_state[:, 0]
+        encoded_input = {k: v.astype(dtype=np.int64) for k, v in encoded_input.items()}
+        model_output = self.session.run(None, input_feed=dict(encoded_input))
+        return model_output[0][:, 0]
     
     
-    def load_database(self, dataset=None, path=None, compute_embeddings=False, batch_size=1):
+    def load_database(self, dataset=None, path=None, compute_embeddings=False, batch_size=2):
         if dataset is not None:
             database = dataset
         elif path is not None:
@@ -22,19 +22,16 @@ class BySearch:
 
         if compute_embeddings:
             database = database.map(
-                lambda x: {"embedding": self.get_embeddings(x["text"]).detach().cpu().numpy()}, 
+                lambda x: {"embedding": self.get_embeddings(x["text"])}, 
                 batched=True,
                 batch_size=batch_size, 
             )
         return database
 
 
-    def __init__(self, device, dataset=None, path=None, compute_embeddings=False, checkpoint="KoichiYasuoka/roberta-small-belarusian"):
-        self.device     = device
-        self.checkpoint = checkpoint
-        self.tokenizer  = AutoTokenizer.from_pretrained(checkpoint)
-        self.model      = AutoModel.from_pretrained(checkpoint)
-        self.model.to(device)
+    def __init__(self, dataset=None, path=None, compute_embeddings=False, tokenizer_checkpoint="KoichiYasuoka/roberta-small-belarusian", model_path='onnx\\by-model.onnx'):
+        self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
+        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
         
         self.database = self.load_database(dataset, path, compute_embeddings)
         self.database.add_faiss_index('embedding')
@@ -47,7 +44,7 @@ class BySearch:
 
 
     def search(self, prompt):
-        embedding = self.get_embeddings([prompt]).detach().cpu().numpy()
+        embedding = self.get_embeddings([prompt])
         scores, samples = self.database.get_nearest_examples('embedding', embedding, k=5)
         results_df = pd.DataFrame.from_dict(samples)
         results_df['scores'] = scores
