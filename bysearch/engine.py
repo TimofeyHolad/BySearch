@@ -30,12 +30,12 @@ class BySearch:
         self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
         self.dataset = self.load_dataset(dataset, path, compute_embeddings)
         if backend == 'local':
-            self.beckend = LocalBackend(self.dataset) 
+            self.backend = LocalBackend(self.dataset) 
 
     def add_data(self, dataset=None, path=None, compute_embeddings=False):
         dataset = self.load_dataset(dataset, path, compute_embeddings)
-        self.beckend.add_data(dataset)
+        self.backend.add_data(dataset)
 
     def search(self, prompt):
         embedding = self.get_embeddings([prompt])
-        return self.search(embedding)
+        return self.backend.search(embedding)
