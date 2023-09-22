@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import pandas as pd
 from datasets import concatenate_datasets
+import pinecone
 
 class DataBackend(ABC):
     @abstractmethod
@@ -33,3 +34,16 @@ class LocalBackend(DataBackend):
                 print(f'URL: {row.url}')
                 print(f'Text: {row.text}')
         return results_df
+    
+
+class PineconBackend(DataBackend):
+    def __init__(self, dataset, api_key, environment='gcp-starter'):
+        self.api_key = api_key
+        self.environment = environment
+        pinecone.init(api_key=api_key, environment=environment)
+        
+    def add_data(self, dataset):
+        pass
+
+    def search(self, embedding, verbose=True):
+        pass
