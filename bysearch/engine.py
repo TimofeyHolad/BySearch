@@ -3,7 +3,8 @@ from transformers import AutoTokenizer
 from datasets import load_from_disk
 import onnxruntime as ort
 
-from .backends import LocalBackend
+from .backends import LocalBackend, PineconBackend
+
 
 class BySearch:
     def get_embeddings(self, text_list):
@@ -25,12 +26,14 @@ class BySearch:
             )
         return dataset
 
-    def __init__(self, dataset=None, path=None, compute_embeddings=False, tokenizer_checkpoint="KoichiYasuoka/roberta-small-belarusian", model_path='onnx\\by-model.onnx', backend='local'):
+    def __init__(self, dataset=None, path=None, compute_embeddings=False, tokenizer_checkpoint="KoichiYasuoka/roberta-small-belarusian", model_path='onnx\\by-model.onnx', backend='local', **kwargs):
         self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
         self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
         self.dataset = self.load_dataset(dataset, path, compute_embeddings)
         if backend == 'local':
-            self.backend = LocalBackend(self.dataset) 
+            self.backend = LocalBackend(self.dataset)
+        if backend == 'pinecon':
+            self.backend = PineconBackend(self.dataset, **kwargs)
 
     def add_data(self, dataset=None, path=None, compute_embeddings=False):
         dataset = self.load_dataset(dataset, path, compute_embeddings)
