@@ -1,3 +1,4 @@
+import math
 from abc import ABC, abstractmethod
 import pandas as pd
 from datasets import concatenate_datasets
@@ -37,13 +38,31 @@ class LocalBackend(DataBackend):
     
 
 class PineconBackend(DataBackend):
-    def __init__(self, dataset, api_key, environment='gcp-starter'):
+    def dataset_upsert(self, dataset, batch_size):
+        dataset_size = len(dataset)
+        for batch_start in range(0, dataset_size, batch_size):
+            batch_end = min(batch_start + batch_size, dataset_size)
+            data = dataset[batch_start: batch_end] 
+            ids = [str(hash(url)) for url in data['url']]
+            vecs = data['embedding']
+            metadata = [{'url': row[0], 'text': row[1][:20000]} for row in zip(data['url'], data['text'])]
+            to_upsert = list(zip(ids, vecs, metadata))
+            self.index.upsert(vectors=to_upsert, batch_size=1000)
+
+    def __init__(self, dataset=None, api_key=None, environment='gcp-starter', index_name=None, batch_size=50000):
         self.api_key = api_key
         self.environment = environment
+        dimension = len(dataset[0]['embedding'])
+        shards = math.ceil(dataset.size_in_bytes / 1024 ** 3)
         pinecone.init(api_key=api_key, environment=environment)
+        if index_name not in pinecone.list_indexes():
+            pinecone.create_index(index_name, dimension=dimension, shards=shards)
+        self.index = pinecone.Index(index_name)
+        if dataset is not None:
+            self.dataset_upsert(dataset, batch_size)
         
-    def add_data(self, dataset):
-        pass
+    def add_data(self, dataset, batch_size=50000):
+        self.dataset_upsert(dataset, batch_size)
 
     def search(self, embedding, verbose=True):
-        pass
+        rez = self.index.query(embedding, top_k=5, include_values=False ,include_metadata=True)
