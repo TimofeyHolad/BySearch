@@ -32,7 +32,7 @@ class BySearch:
         self.dataset = self.load_dataset(dataset, path, compute_embeddings)
         if backend == 'local':
             self.backend = LocalBackend(self.dataset)
-        if backend == 'pinecon':
+        if backend == 'pinecone':
             self.backend = PineconBackend(self.dataset, **kwargs)
 
     def add_data(self, dataset=None, path=None, compute_embeddings=False):

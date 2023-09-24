@@ -38,25 +38,25 @@ class LocalBackend(DataBackend):
     
 
 class PineconBackend(DataBackend):
-    def dataset_upsert(self, dataset, batch_size):
+    def dataset_upsert(self, dataset, batch_size, upsert_minibatch_size=1000):
         dataset_size = len(dataset)
         for batch_start in range(0, dataset_size, batch_size):
             batch_end = min(batch_start + batch_size, dataset_size)
             data = dataset[batch_start: batch_end] 
             ids = [str(hash(url)) for url in data['url']]
             vecs = data['embedding']
-            metadata = [{'url': row[0], 'text': row[1][:20000]} for row in zip(data['url'], data['text'])]
+            metadata = [{'url': row[0], 'text': row[1][:100]} for row in zip(data['url'], data['text'])]
             to_upsert = list(zip(ids, vecs, metadata))
-            self.index.upsert(vectors=to_upsert, batch_size=1000)
+            self.index.upsert(vectors=to_upsert, batch_size=upsert_minibatch_size)
 
     def __init__(self, dataset=None, api_key=None, environment='gcp-starter', index_name=None, batch_size=50000):
         self.api_key = api_key
         self.environment = environment
-        dimension = len(dataset[0]['embedding'])
-        shards = math.ceil(dataset.size_in_bytes / 1024 ** 3)
         pinecone.init(api_key=api_key, environment=environment)
         if index_name not in pinecone.list_indexes():
-            pinecone.create_index(index_name, dimension=dimension, shards=shards)
+            dimension = len(dataset[0]['embedding'])
+            shards = math.ceil(dataset.size_in_bytes / 1024 ** 3)
+            pinecone.create_index(index_name, dimension=dimension, shards=shards, metric='euclidean')
         self.index = pinecone.Index(index_name)
         if dataset is not None:
             self.dataset_upsert(dataset, batch_size)
@@ -65,4 +65,6 @@ class PineconBackend(DataBackend):
         self.dataset_upsert(dataset, batch_size)
 
     def search(self, embedding, verbose=True):
+        embedding = embedding.tolist()
         rez = self.index.query(embedding, top_k=5, include_values=False ,include_metadata=True)
+        return rez
