@@ -39,6 +39,6 @@ class BySearch:
         dataset = self.load_dataset(dataset, path, compute_embeddings)
         self.backend.add_data(dataset)
 
-    def search(self, prompt):
+    def search(self, prompt, k=5, verbose=True):
         embedding = self.get_embeddings([prompt])
-        return self.backend.search(embedding)
+        return self.backend.search(embedding, k, verbose)
