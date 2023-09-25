@@ -41,7 +41,7 @@ class LocalBackend(DataBackend):
     
 
 class PineconBackend(DataBackend):
-    def dataset_upsert(self, dataset, batch_size=50000, upsert_minibatch_size=1000, text_size=100):
+    def dataset_upsert(self, dataset, batch_size, upsert_minibatch_size=1000, text_size=100):
         assert text_size < 20000, 'text_size should be less then 20000'
         dataset_size = len(dataset)
         for batch_start in range(0, dataset_size, batch_size):
@@ -56,6 +56,7 @@ class PineconBackend(DataBackend):
     def __init__(self, dataset=None, api_key=None, environment='gcp-starter', index_name=None, batch_size=50000):
         self.api_key = api_key
         self.environment = environment
+        self.batch_size=batch_size
         pinecone.init(api_key=api_key, environment=environment)
         if index_name not in pinecone.list_indexes():
             dimension = len(dataset[0]['embedding'])
@@ -66,7 +67,7 @@ class PineconBackend(DataBackend):
             self.dataset_upsert(dataset, batch_size)
         
     def add_data(self, dataset):
-        self.dataset_upsert(dataset)
+        self.dataset_upsert(dataset, batch_size=self.batch_size)
 
     def search(self, embedding, k, verbose):
         embedding = embedding.tolist()
