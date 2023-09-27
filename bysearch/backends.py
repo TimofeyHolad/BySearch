@@ -4,6 +4,7 @@ import pandas as pd
 from datasets import concatenate_datasets
 import pinecone
 
+
 class DataBackend(ABC):
     @abstractmethod
     def add_data(self):
@@ -53,7 +54,7 @@ class PineconBackend(DataBackend):
             to_upsert = list(zip(ids, vecs, metadata))
             self.index.upsert(vectors=to_upsert, batch_size=upsert_minibatch_size)
 
-    def __init__(self, dataset=None, api_key=None, environment='gcp-starter', index_name=None, batch_size=50000):
+    def __init__(self, dataset=None, api_key=None, environment='gcp-starter', index_name=None, metric='euclidian', batch_size=50000):
         self.api_key = api_key
         self.environment = environment
         self.batch_size=batch_size
@@ -61,7 +62,7 @@ class PineconBackend(DataBackend):
         if index_name not in pinecone.list_indexes():
             dimension = len(dataset[0]['embedding'])
             shards = math.ceil(dataset.size_in_bytes / 1024 ** 3)
-            pinecone.create_index(index_name, dimension=dimension, shards=shards, metric='euclidean')
+            pinecone.create_index(index_name, dimension=dimension, shards=shards, metric=metric)
         self.index = pinecone.Index(index_name)
         if dataset is not None:
             self.dataset_upsert(dataset, batch_size)
