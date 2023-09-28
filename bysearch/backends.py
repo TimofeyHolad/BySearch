@@ -54,7 +54,7 @@ class PineconBackend(DataBackend):
             to_upsert = list(zip(ids, vecs, metadata))
             self.index.upsert(vectors=to_upsert, batch_size=upsert_minibatch_size)
 
-    def __init__(self, dataset=None, api_key=None, environment='gcp-starter', index_name=None, metric='euclidian', batch_size=50000):
+    def __init__(self, dataset=None, api_key=None, environment='gcp-starter', index_name=None, metric='euclidean', batch_size=50000):
         self.api_key = api_key
         self.environment = environment
         self.batch_size=batch_size
