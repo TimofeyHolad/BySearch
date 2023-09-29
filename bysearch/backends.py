@@ -90,3 +90,41 @@ class PineconBackend(DataBackend):
         return results_df
     
 
+class ChromaBackend(DataBackend):
+    def dataset_upsert(self, dataset, batch_size):
+        dataset_size = len(dataset)
+        for batch_start in range(0, dataset_size, batch_size):
+            batch_end = min(batch_start + batch_size, dataset_size)
+            data = dataset[batch_start: batch_end] 
+            ids = [str(hash(url)) for url in data['url']]
+            embeddings = data['embedding']
+            documents = data['text']
+            metadatas = [{'url': row[0]} for row in data['url']]
+            self.collection.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
+        
+    def __init__(self, dataset=None, collection_name=None):
+        client = chromadb.Client()
+        self.collection = client.get_or_create_collection(collection_name)
+        if dataset is not None:
+            self.dataset_upsert(dataset)
+
+    def add_data(self, dataset):
+        self.dataset_upsert(dataset)
+
+    def search(self, embedding, k, verbose):
+        embedding = embedding.tolist()
+        answer = self.collection.query(embedding, n_results=k)
+        results_dict = {
+            'score':[row for row in answer['distances']],
+            'text': [row for row in answer['documents']],
+            'url': [row['url'] for row in answer['metadatas']],
+        }
+        results_df = pd.DataFrame.from_dict(results_dict)
+        results_df.sort_values('score', ascending=False, inplace=True)
+        if verbose:
+            for _, row in results_df.iterrows():
+                print(148 * '-')
+                print(f'Score: {row.score}')
+                print(f'URL: {row.url}')
+                print(f'Text: {row.text}')
+        return results_df
