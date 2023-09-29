@@ -3,7 +3,7 @@ from transformers import AutoTokenizer
 from datasets import load_from_disk
 import onnxruntime as ort
 
-from .backends import LocalBackend, PineconBackend
+from .backends import LocalBackend, PineconBackend, ChromaBackend
 
 
 class BySearch:
@@ -34,6 +34,8 @@ class BySearch:
             self.backend = LocalBackend(self.dataset)
         if backend == 'pinecone':
             self.backend = PineconBackend(self.dataset, **kwargs)
+        if backend == 'chroma':
+            self.backend = ChromaBackend(self.dataset, **kwargs)
 
     def add_data(self, dataset=None, path=None, compute_embeddings=False):
         dataset = self.load_dataset(dataset, path, compute_embeddings)

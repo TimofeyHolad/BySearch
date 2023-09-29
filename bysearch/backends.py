@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from datasets import concatenate_datasets
 import pinecone
+import chromadb
 
 
 class DataBackend(ABC):
@@ -42,22 +43,22 @@ class LocalBackend(DataBackend):
     
 
 class PineconBackend(DataBackend):
-    def dataset_upsert(self, dataset, batch_size, upsert_minibatch_size=1000, text_size=100):
+    def dataset_upsert(self, dataset, upsert_minibatch_size=1000, text_size=100):
         assert text_size < 20000, 'text_size should be less then 20000'
         dataset_size = len(dataset)
-        for batch_start in range(0, dataset_size, batch_size):
-            batch_end = min(batch_start + batch_size, dataset_size)
+        for batch_start in range(0, dataset_size, self.upsert_batch_size):
+            batch_end = min(batch_start + self.upsert_batch_size, dataset_size)
             data = dataset[batch_start: batch_end] 
             ids = [str(hash(url)) for url in data['url']]
-            vecs = data['embedding']
-            metadata = [{'url': row[0], 'text': row[1][:text_size]} for row in zip(data['url'], data['text'])]
-            to_upsert = list(zip(ids, vecs, metadata))
+            embeddings = data['embedding']
+            metadatas = [{'url': row[0], 'text': row[1][:text_size]} for row in zip(data['url'], data['text'])]
+            to_upsert = list(zip(ids, embeddings, metadatas))
             self.index.upsert(vectors=to_upsert, batch_size=upsert_minibatch_size)
 
-    def __init__(self, dataset=None, api_key=None, environment='gcp-starter', index_name=None, metric='euclidean', batch_size=50000):
+    def __init__(self, dataset=None, api_key=None, environment='gcp-starter', index_name=None, metric='euclidean', upsert_batch_size=50000):
         self.api_key = api_key
         self.environment = environment
-        self.batch_size=batch_size
+        self.upsert_batch_size = upsert_batch_size
         pinecone.init(api_key=api_key, environment=environment)
         if index_name not in pinecone.list_indexes():
             dimension = len(dataset[0]['embedding'])
@@ -65,10 +66,10 @@ class PineconBackend(DataBackend):
             pinecone.create_index(index_name, dimension=dimension, shards=shards, metric=metric)
         self.index = pinecone.Index(index_name)
         if dataset is not None:
-            self.dataset_upsert(dataset, batch_size)
+            self.dataset_upsert(dataset)
         
     def add_data(self, dataset):
-        self.dataset_upsert(dataset, batch_size=self.batch_size)
+        self.dataset_upsert(dataset)
 
     def search(self, embedding, k, verbose):
         embedding = embedding.tolist()
@@ -77,6 +78,52 @@ class PineconBackend(DataBackend):
             'score':[row['score'] for row in answer['matches']],
             'text': [row['metadata']['text'] for row in answer['matches']],
             'url': [row['metadata']['url'] for row in answer['matches']],
+        }
+        results_df = pd.DataFrame.from_dict(results_dict)
+        results_df.sort_values('score', ascending=False, inplace=True)
+        if verbose:
+            for _, row in results_df.iterrows():
+                print(148 * '-')
+                print(f'Score: {row.score}')
+                print(f'URL: {row.url}')
+                print(f'Text: {row.text}')
+        return results_df
+    
+
+class ChromaBackend(DataBackend):
+    def dataset_upsert(self, dataset):
+        dataset_size = len(dataset)
+        for batch_start in range(0, dataset_size, self.upsert_batch_size):
+            batch_end = min(batch_start + self.upsert_batch_size, dataset_size)
+            data = dataset[batch_start: batch_end] 
+            ids = [str(hash(url)) for url in data['url']]
+            embeddings = data['embedding']
+            documents = data['text']
+            metadatas = [{'url': row} for row in data['url']]
+            self.collection.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
+        
+    def __init__(self, dataset=None, type='ephemeral', collection_name=None, upsert_batch_size=5461, **kwargs):
+        if type == 'ephemeral':
+            client = chromadb.EphemeralClient(**kwargs)
+        if type == 'persistent':
+            client = chromadb.PersistentClient(**kwargs)
+        if type == 'http':
+            client = chromadb.HttpClient(**kwargs)
+        self.upsert_batch_size = upsert_batch_size
+        self.collection = client.get_or_create_collection(collection_name)
+        if dataset is not None:
+            self.dataset_upsert(dataset)
+
+    def add_data(self, dataset):
+        self.dataset_upsert(dataset)
+
+    def search(self, embedding, k, verbose):
+        embedding = embedding.tolist()
+        answer = self.collection.query(embedding, n_results=k)
+        results_dict = {
+            'score':[row for row in answer['distances'][0]],
+            'text': [row for row in answer['documents'][0]],
+            'url': [row['url'] for row in answer['metadatas'][0]],
         }
         results_df = pd.DataFrame.from_dict(results_dict)
         results_df.sort_values('score', ascending=False, inplace=True)
