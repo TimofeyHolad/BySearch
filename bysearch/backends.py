@@ -43,11 +43,11 @@ class LocalBackend(DataBackend):
     
 
 class PineconBackend(DataBackend):
-    def dataset_upsert(self, dataset, upsert_batch_size, upsert_minibatch_size=1000, text_size=100):
+    def dataset_upsert(self, dataset, upsert_minibatch_size=1000, text_size=100):
         assert text_size < 20000, 'text_size should be less then 20000'
         dataset_size = len(dataset)
-        for batch_start in range(0, dataset_size, upsert_batch_size):
-            batch_end = min(batch_start + upsert_batch_size, dataset_size)
+        for batch_start in range(0, dataset_size, self.upsert_batch_size):
+            batch_end = min(batch_start + self.upsert_batch_size, dataset_size)
             data = dataset[batch_start: batch_end] 
             ids = [str(hash(url)) for url in data['url']]
             embeddings = data['embedding']
@@ -66,10 +66,10 @@ class PineconBackend(DataBackend):
             pinecone.create_index(index_name, dimension=dimension, shards=shards, metric=metric)
         self.index = pinecone.Index(index_name)
         if dataset is not None:
-            self.dataset_upsert(dataset, upsert_batch_size)
+            self.dataset_upsert(dataset)
         
     def add_data(self, dataset):
-        self.dataset_upsert(dataset, self.upsert_batch_size)
+        self.dataset_upsert(dataset)
 
     def search(self, embedding, k, verbose):
         embedding = embedding.tolist()
@@ -91,19 +91,20 @@ class PineconBackend(DataBackend):
     
 
 class ChromaBackend(DataBackend):
-    def dataset_upsert(self, dataset, batch_size):
+    def dataset_upsert(self, dataset):
         dataset_size = len(dataset)
-        for batch_start in range(0, dataset_size, batch_size):
-            batch_end = min(batch_start + batch_size, dataset_size)
+        for batch_start in range(0, dataset_size, self.upsert_batch_size):
+            batch_end = min(batch_start + self.upsert_batch_size, dataset_size)
             data = dataset[batch_start: batch_end] 
             ids = [str(hash(url)) for url in data['url']]
             embeddings = data['embedding']
             documents = data['text']
-            metadatas = [{'url': row[0]} for row in data['url']]
+            metadatas = [{'url': row} for row in data['url']]
             self.collection.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
         
-    def __init__(self, dataset=None, collection_name=None):
+    def __init__(self, dataset=None, collection_name=None, upsert_batch_size=5461):
         client = chromadb.Client()
+        self.upsert_batch_size = upsert_batch_size
         self.collection = client.get_or_create_collection(collection_name)
         if dataset is not None:
             self.dataset_upsert(dataset)
@@ -115,9 +116,9 @@ class ChromaBackend(DataBackend):
         embedding = embedding.tolist()
         answer = self.collection.query(embedding, n_results=k)
         results_dict = {
-            'score':[row for row in answer['distances']],
-            'text': [row for row in answer['documents']],
-            'url': [row['url'] for row in answer['metadatas']],
+            'score':[row for row in answer['distances'][0]],
+            'text': [row for row in answer['documents'][0]],
+            'url': [row['url'] for row in answer['metadatas'][0]],
         }
         results_df = pd.DataFrame.from_dict(results_dict)
         results_df.sort_values('score', ascending=False, inplace=True)
