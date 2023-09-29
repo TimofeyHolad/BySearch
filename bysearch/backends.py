@@ -102,8 +102,13 @@ class ChromaBackend(DataBackend):
             metadatas = [{'url': row} for row in data['url']]
             self.collection.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
         
-    def __init__(self, dataset=None, collection_name=None, upsert_batch_size=5461):
-        client = chromadb.Client()
+    def __init__(self, dataset=None, type='ephemeral', collection_name=None, upsert_batch_size=5461, **kwargs):
+        if type == 'ephemeral':
+            client = chromadb.EphemeralClient(**kwargs)
+        if type == 'persistent':
+            client = chromadb.PersistentClient(**kwargs)
+        if type == 'http':
+            client = chromadb.HttpClient(**kwargs)
         self.upsert_batch_size = upsert_batch_size
         self.collection = client.get_or_create_collection(collection_name)
         if dataset is not None:
