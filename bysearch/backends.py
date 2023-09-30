@@ -1,7 +1,11 @@
+from typing import Optional
 import math
 from abc import ABC, abstractmethod
+import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
-from datasets import concatenate_datasets
+from pandas import DataFrame
+from datasets import concatenate_datasets, Dataset
 import pinecone
 import chromadb
 
@@ -17,15 +21,15 @@ class DataBackend(ABC):
 
 
 class LocalBackend(DataBackend):
-    def __init__(self, dataset):
+    def __init__(self, dataset: Dataset) -> None:
         self.dataset = dataset
         self.dataset.add_faiss_index('embedding')
         
-    def add_data(self, dataset):
+    def add_data(self, dataset: Dataset) -> None:
         self.dataset = concatenate_datasets([self.dataset, dataset])
         self.dataset.add_faiss_index('embedding')
 
-    def search(self, embedding, k, verbose):
+    def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         scores, samples = self.dataset.get_nearest_examples('embedding', embedding, k=k)
         results_df = pd.DataFrame.from_dict(samples)
         results_df['score'] = scores
@@ -43,7 +47,7 @@ class LocalBackend(DataBackend):
     
 
 class PineconBackend(DataBackend):
-    def dataset_upsert(self, dataset, upsert_minibatch_size=1000, text_size=100):
+    def dataset_upsert(self, dataset: Dataset, upsert_minibatch_size: int = 1000, text_size: int = 100) -> None:
         assert text_size < 20000, 'text_size should be less then 20000'
         dataset_size = len(dataset)
         for batch_start in range(0, dataset_size, self.upsert_batch_size):
@@ -55,7 +59,7 @@ class PineconBackend(DataBackend):
             to_upsert = list(zip(ids, embeddings, metadatas))
             self.index.upsert(vectors=to_upsert, batch_size=upsert_minibatch_size)
 
-    def __init__(self, dataset=None, api_key=None, environment='gcp-starter', index_name=None, metric='euclidean', upsert_batch_size=50000):
+    def __init__(self, dataset: Optional[Dataset] = None, api_key: str = None, environment: str ='gcp-starter', index_name: str = None, metric: str = 'euclidean', upsert_batch_size: int = 50000) -> None:
         self.api_key = api_key
         self.environment = environment
         self.upsert_batch_size = upsert_batch_size
@@ -68,10 +72,10 @@ class PineconBackend(DataBackend):
         if dataset is not None:
             self.dataset_upsert(dataset)
         
-    def add_data(self, dataset):
+    def add_data(self, dataset: Dataset) -> None:
         self.dataset_upsert(dataset)
 
-    def search(self, embedding, k, verbose):
+    def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         embedding = embedding.tolist()
         answer = self.index.query(embedding, top_k=k, include_values=False ,include_metadata=True)
         results_dict = {
@@ -91,7 +95,7 @@ class PineconBackend(DataBackend):
     
 
 class ChromaBackend(DataBackend):
-    def dataset_upsert(self, dataset):
+    def dataset_upsert(self, dataset: Dataset) -> None:
         dataset_size = len(dataset)
         for batch_start in range(0, dataset_size, self.upsert_batch_size):
             batch_end = min(batch_start + self.upsert_batch_size, dataset_size)
@@ -102,7 +106,7 @@ class ChromaBackend(DataBackend):
             metadatas = [{'url': row} for row in data['url']]
             self.collection.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
         
-    def __init__(self, dataset=None, type='ephemeral', collection_name=None, upsert_batch_size=5461, **kwargs):
+    def __init__(self, dataset: Optional[Dataset] = None, type: str = 'ephemeral', collection_name: str = None, upsert_batch_size: int = 5461, **kwargs) -> None:
         if type == 'ephemeral':
             client = chromadb.EphemeralClient(**kwargs)
         if type == 'persistent':
@@ -114,10 +118,10 @@ class ChromaBackend(DataBackend):
         if dataset is not None:
             self.dataset_upsert(dataset)
 
-    def add_data(self, dataset):
+    def add_data(self, dataset: Dataset) -> None:
         self.dataset_upsert(dataset)
 
-    def search(self, embedding, k, verbose):
+    def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         embedding = embedding.tolist()
         answer = self.collection.query(embedding, n_results=k)
         results_dict = {
