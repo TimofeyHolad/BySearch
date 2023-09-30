@@ -1,6 +1,8 @@
 from typing import Optional
 import math
 from abc import ABC, abstractmethod
+import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 from pandas import DataFrame
 from datasets import concatenate_datasets, Dataset
@@ -27,7 +29,7 @@ class LocalBackend(DataBackend):
         self.dataset = concatenate_datasets([self.dataset, dataset])
         self.dataset.add_faiss_index('embedding')
 
-    def search(self, embedding: list[list[float]], k: int, verbose: bool) -> DataFrame:
+    def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         scores, samples = self.dataset.get_nearest_examples('embedding', embedding, k=k)
         results_df = pd.DataFrame.from_dict(samples)
         results_df['score'] = scores
@@ -57,7 +59,7 @@ class PineconBackend(DataBackend):
             to_upsert = list(zip(ids, embeddings, metadatas))
             self.index.upsert(vectors=to_upsert, batch_size=upsert_minibatch_size)
 
-    def __init__(self, dataset: Optional(Dataset) = None, api_key: str = None, environment: str ='gcp-starter', index_name: str = None, metric: str = 'euclidean', upsert_batch_size: int = 50000) -> None:
+    def __init__(self, dataset: Optional[Dataset] = None, api_key: str = None, environment: str ='gcp-starter', index_name: str = None, metric: str = 'euclidean', upsert_batch_size: int = 50000) -> None:
         self.api_key = api_key
         self.environment = environment
         self.upsert_batch_size = upsert_batch_size
@@ -73,7 +75,7 @@ class PineconBackend(DataBackend):
     def add_data(self, dataset: Dataset) -> None:
         self.dataset_upsert(dataset)
 
-    def search(self, embedding: list[list[float]], k: int, verbose: bool) -> DataFrame:
+    def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         embedding = embedding.tolist()
         answer = self.index.query(embedding, top_k=k, include_values=False ,include_metadata=True)
         results_dict = {
@@ -119,7 +121,7 @@ class ChromaBackend(DataBackend):
     def add_data(self, dataset: Dataset) -> None:
         self.dataset_upsert(dataset)
 
-    def search(self, embedding: list[list[float]], k: int, verbose: bool) -> DataFrame:
+    def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         embedding = embedding.tolist()
         answer = self.collection.query(embedding, n_results=k)
         results_dict = {
