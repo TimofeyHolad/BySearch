@@ -21,8 +21,13 @@ class DataBackend(ABC):
 
 
 class LocalBackend(DataBackend):
-    def __init__(self, dataset: Dataset) -> None:
+    def __init__(self, dataset: Dataset, text_column: str) -> None:
         self.dataset = dataset
+        self.text_column = text_column
+        self.columns = dataset.column_names
+        self.columns.remove('embedding')
+        self.columns.remove(text_column)
+        self.columns.insert(0, text_column)
         self.dataset.add_faiss_index('embedding')
         
     def add_data(self, dataset: Dataset) -> None:
@@ -35,14 +40,15 @@ class LocalBackend(DataBackend):
         results_df['score'] = scores
         results_df.sort_values('score', ascending=False, inplace=True)
         results_df.reset_index(inplace=True)
-        results_df.drop(['timestamp','embedding', 'index'], axis=1, inplace=True)
-        results_df = results_df.reindex(columns=['score', 'text', 'url'])
+        results_df.drop(['embedding', 'index'], axis=1, inplace=True)
+        columns = self.columns
+        columns.insert(0, 'score')
+        results_df = results_df.reindex(columns=columns)
         if verbose:
             for _, row in results_df.iterrows():
                 print(148 * '-')
-                print(f'Score: {row.score}')
-                print(f'URL: {row.url}')
-                print(f'Text: {row.text}')
+                for column in columns:
+                    print('{}: {}'.format(column, row[column]))
         return results_df
     
 
@@ -59,7 +65,12 @@ class PineconBackend(DataBackend):
             to_upsert = list(zip(ids, embeddings, metadatas))
             self.index.upsert(vectors=to_upsert, batch_size=upsert_minibatch_size)
 
-    def __init__(self, dataset: Optional[Dataset] = None, api_key: str = None, environment: str ='gcp-starter', index_name: str = None, metric: str = 'euclidean', upsert_batch_size: int = 50000) -> None:
+    def __init__(self, dataset: Optional[Dataset] = None, text_column: str = None, api_key: str = None, environment: str ='gcp-starter', index_name: str = None, metric: str = 'euclidean', upsert_batch_size: int = 50000) -> None:
+        self.text_column = text_column
+        self.columns = dataset.column_names
+        self.columns.remove('embedding')
+        self.columns.remove(text_column)
+        self.columns.insert(0, text_column)
         self.api_key = api_key
         self.environment = environment
         self.upsert_batch_size = upsert_batch_size
@@ -106,7 +117,12 @@ class ChromaBackend(DataBackend):
             metadatas = [{'url': row} for row in data['url']]
             self.collection.upsert(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
         
-    def __init__(self, dataset: Optional[Dataset] = None, type: str = 'ephemeral', collection_name: str = None, upsert_batch_size: int = 5461, **kwargs) -> None:
+    def __init__(self, dataset: Optional[Dataset] = None, text_column: str = None, type: str = 'ephemeral', collection_name: str = None, upsert_batch_size: int = 5461, **kwargs) -> None:
+        self.text_column = text_column
+        self.columns = dataset.column_names
+        self.columns.remove('embedding')
+        self.columns.remove(text_column)
+        self.columns.insert(0, text_column)
         if type == 'ephemeral':
             client = chromadb.EphemeralClient(**kwargs)
         if type == 'persistent':
