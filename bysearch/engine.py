@@ -22,7 +22,7 @@ class BySearch:
         text_list = data_dict['text']
         return {'embedding': self.get_embedding(text_list)}
 
-    def load_dataset(self, dataset: Optional[Dataset] = None, path: Optional[str] = None, text_column: str = None, compute_embeddings: bool = False, batch_size: int = 2) -> Dataset:
+    def load_dataset(self, dataset: Optional[Dataset] = None, path: Optional[str] = None, compute_embeddings: bool = False, batch_size: int = 2) -> Dataset:
         if path is not None:
             dataset = load_from_disk(path)
         if compute_embeddings:
@@ -37,7 +37,7 @@ class BySearch:
         self.text_column_name = text_column_name
         self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
         self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
-        dataset = self.load_dataset(dataset, path, text_column_name, compute_embeddings)
+        dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
         if backend == 'local':
             self.backend = LocalBackend(dataset, text_column_name)
         if backend == 'pinecone':
@@ -46,7 +46,7 @@ class BySearch:
             self.backend = ChromaBackend(dataset, text_column_name, **kwargs)
 
     def add_data(self, dataset: Optional[Dataset] = None, path: str = None, compute_embeddings: bool = False) -> None:
-        dataset = self.load_dataset(dataset, path, compute_embeddings)
+        dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
         self.backend.add_data(dataset)
 
     def search(self, prompt: str, k: int = 5, verbose: bool = True) -> DataFrame:
