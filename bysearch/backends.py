@@ -10,6 +10,14 @@ import pinecone
 import chromadb
 
 
+def get_default_schema(dataset: Dataset, text_column_name: str) -> list[str]:
+    schema = dataset.column_names
+    schema.remove('embedding')
+    schema.remove(text_column_name)
+    schema.insert(0, text_column_name)
+    return schema
+
+
 class DataBackend(ABC):
     @abstractmethod
     def add_data(self):
@@ -21,16 +29,19 @@ class DataBackend(ABC):
 
 
 class LocalBackend(DataBackend):
-    def __init__(self, dataset: Dataset, text_column_name: str) -> None:
+    def __init__(self, dataset: Dataset, text_column_name: str, schema: Optional[str] = None) -> None:
         self.dataset = dataset
         self.text_column_name = text_column_name
-        self.column_names = dataset.column_names
-        self.column_names.remove('embedding')
-        self.column_names.remove(text_column_name)
-        self.column_names.insert(0, self.text_column_name)
+        if schema is None:
+            self.schema = get_default_schema(dataset, self.text_column_name)
+        else:
+            self.schema = schema
         self.dataset.add_faiss_index('embedding')
         
-    def add_data(self, dataset: Dataset) -> None:
+    def add_data(self, dataset: Dataset, schema: list[str] = None) -> None:
+        if schema is None:
+            schema = get_default_schema(dataset, self.text_column_name)
+        assert self.schema == schema, "New schema of data doesn't coincide with the base schema"
         self.dataset = concatenate_datasets([self.dataset, dataset])
         self.dataset.add_faiss_index('embedding')
 
@@ -41,11 +52,12 @@ class LocalBackend(DataBackend):
         results_df.sort_values('score', ascending=False, inplace=True)
         results_df.reset_index(inplace=True)
         results_df.drop(['embedding', 'index'], axis=1, inplace=True)
-        results_df = results_df.reindex(columns=self.column_names)
+        representation = ['score'] + self.schema
+        results_df = results_df.reindex(columns=representation)
         if verbose:
             for _, row in results_df.iterrows():
                 print(144 * '-')
-                for column in self.column_names:
+                for column in representation:
                     print('{}: {}'.format(column, row[column]))
         return results_df
     
