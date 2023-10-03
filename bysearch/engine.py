@@ -6,7 +6,7 @@ from datasets import load_from_disk, Dataset
 import onnxruntime as ort
 from pandas import DataFrame
 
-from .backends import LocalBackend, PineconBackend, ChromaBackend
+from .backends import LocalBackend, PineconeBackend, ChromaBackend
 
 
 class BySearch:
@@ -41,7 +41,7 @@ class BySearch:
         if backend == 'local':
             self.backend = LocalBackend(dataset, text_column_name)
         if backend == 'pinecone':
-            self.backend = PineconBackend(dataset, text_column_name, **kwargs)
+            self.backend = PineconeBackend(dataset, text_column_name, **kwargs)
         if backend == 'chroma':
             self.backend = ChromaBackend(dataset, text_column_name, **kwargs)
 
