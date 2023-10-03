@@ -91,7 +91,7 @@ class PineconeBackend(DataBackend):
         embedding = embedding.tolist()
         answer = self.index.query(embedding, top_k=k, include_values=False ,include_metadata=True)
         column_names = answer['matches'][0]['metadata'].keys()
-        scores = {'score':[row['score'] for row in answer['matches']]}
+        scores = [row['score'] for row in answer['matches']]
         samples = {column_name: [row['metadata'][column_name] for row in answer['matches']] for column_name in column_names}
         results_df = DataFrame.from_dict(samples)
         results_df.insert(0, 'score', scores)
