@@ -136,18 +136,12 @@ class ChromaBackend(DataBackend):
         embedding = embedding.tolist()
         answer = self.collection.query(embedding, n_results=k)
         column_names = answer['metadatas'][0][0].keys()
-        results_dict = {
-            'score':[row for row in answer['distances'][0]],
-            'text': [row for row in answer['documents'][0]],
-        }
-        metadata_dict = {column_name: [row[column_name] for row in answer['metadatas'][0]] for column_name in column_names}
-        results_dict = results_dict | metadata_dict
-        results_df = DataFrame.from_dict(results_dict)
-        results_df.sort_values('score', ascending=False, inplace=True)
+        scores = [row for row in answer['distances'][0]]
+        texts = [row for row in answer['documents'][0]]
+        samples = {column_name: [row[column_name] for row in answer['metadatas'][0]] for column_name in column_names}
+        results_df = DataFrame.from_dict(samples)
+        results_df.insert(0, 'score', scores)
+        results_df.insert(1, 'text', texts)
         if verbose:
-            for _, row in results_df.iterrows():
-                print(144 * '-')
-                print('{}: {}'.format(self.text_column_name, row[self.text_column_name]))
-                for column in column_names:
-                    print('{}: {}'.format(column, row[column]))
+            print_dataframe(results_df)
         return results_df
