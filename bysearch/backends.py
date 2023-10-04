@@ -90,9 +90,8 @@ class PineconeBackend(DataBackend):
     def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         embedding = embedding.tolist()
         answer = self.index.query(embedding, top_k=k, include_values=False ,include_metadata=True)
-        column_names = answer['matches'][0]['metadata'].keys()
         scores = [row['score'] for row in answer['matches']]
-        samples = {column_name: [row['metadata'][column_name] for row in answer['matches']] for column_name in column_names}
+        samples = [row['metadata'] for row in answer['matches']]
         results_df = DataFrame.from_dict(samples)
         results_df.insert(0, 'score', scores)
         if verbose:
@@ -135,10 +134,9 @@ class ChromaBackend(DataBackend):
     def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         embedding = embedding.tolist()
         answer = self.collection.query(embedding, n_results=k)
-        column_names = answer['metadatas'][0][0].keys()
-        scores = [row for row in answer['distances'][0]]
-        texts = [row for row in answer['documents'][0]]
-        samples = {column_name: [row[column_name] for row in answer['metadatas'][0]] for column_name in column_names}
+        scores = answer['distances'][0]
+        texts = answer['documents'][0]
+        samples = answer['metadatas'][0]
         results_df = DataFrame.from_dict(samples)
         results_df.insert(0, 'score', scores)
         results_df.insert(1, 'text', texts)
