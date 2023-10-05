@@ -33,17 +33,17 @@ class BySearch:
             )
         return dataset
 
-    def __init__(self, dataset: Optional[Dataset] = None, path: Optional[str] = None, text_column_name: str = None, compute_embeddings: bool = False, tokenizer_checkpoint: str = "KoichiYasuoka/roberta-small-belarusian", model_path: str = 'onnx\\by-model.onnx', backend: str = 'local', **kwargs) -> None:
+    def __init__(self, dataset: Optional[Dataset] = None, path: Optional[str] = None, text_column_name: str = None, id_column_name: str = None, compute_embeddings: bool = False, tokenizer_checkpoint: str = "KoichiYasuoka/roberta-small-belarusian", model_path: str = 'onnx\\by-model.onnx', backend: str = 'local', **kwargs) -> None:
         self.text_column_name = text_column_name
         self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
         self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
         dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
         if backend == 'local':
-            self.backend = LocalBackend(dataset, text_column_name)
+            self.backend = LocalBackend(dataset, text_column_name, id_column_name)
         if backend == 'pinecone':
-            self.backend = PineconeBackend(dataset, text_column_name, **kwargs)
+            self.backend = PineconeBackend(dataset, text_column_name, id_column_name, **kwargs)
         if backend == 'chroma':
-            self.backend = ChromaBackend(dataset, text_column_name, **kwargs)
+            self.backend = ChromaBackend(dataset, text_column_name, id_column_name, **kwargs)
 
     def upsert(self, dataset: Optional[Dataset] = None, path: str = None, compute_embeddings: bool = False) -> None:
         dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)

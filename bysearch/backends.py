@@ -17,6 +17,16 @@ def print_dataframe(df: DataFrame) -> None:
             print('{}: {}'.format(column, row[column]))
 
 
+def preprocess_column_names(column_names: list[str], text_column_name: str, id_column_name: str) -> list[str]:
+    column_names = column_names.copy()
+    column_names.remove('embedding')
+    column_names.remove(text_column_name)
+    column_names.remove(id_column_name)
+    column_names.insert(0, id_column_name)
+    column_names.insert(1, text_column_name)
+    return column_names
+
+
 class DataBackend(ABC):
     @abstractmethod
     def upsert(self):
@@ -28,13 +38,11 @@ class DataBackend(ABC):
 
 
 class LocalBackend(DataBackend):
-    def __init__(self, dataset: Dataset, text_column_name: str) -> None:
+    def __init__(self, dataset: Dataset, text_column_name: str, id_column_name: str) -> None:
         self.dataset = dataset
         self.text_column_name = text_column_name
-        self.column_names = dataset.column_names
-        self.column_names.remove('embedding')
-        self.column_names.remove(text_column_name)
-        self.column_names.insert(0, self.text_column_name)
+        self.id_column_name = id_column_name
+        self.column_names = preprocess_column_names(dataset.column_names, text_column_name, id_column_name)
         self.dataset.add_faiss_index('embedding')
         
     def upsert(self, dataset: Dataset) -> None:
