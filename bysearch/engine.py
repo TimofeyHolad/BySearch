@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Optional, Any, Iterable
 import numpy as np
 from numpy.typing import NDArray
 from transformers import AutoTokenizer
@@ -48,6 +48,9 @@ class BySearch:
     def upsert(self, dataset: Optional[Dataset] = None, path: str = None, compute_embeddings: bool = False) -> None:
         dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
         self.backend.upsert(dataset)
+
+    def delete(self, ids: Iterable) -> None:
+        self.backend.delete(ids)
 
     def search(self, prompt: str, k: int = 5, verbose: bool = True) -> DataFrame:
         embedding = self.get_embedding([prompt])

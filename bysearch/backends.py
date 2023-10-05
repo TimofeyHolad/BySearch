@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Iterable
 import math
 from abc import ABC, abstractmethod
 import numpy as np
@@ -40,6 +40,10 @@ class DataBackend(ABC):
     def search(self):
         pass
 
+    @abstractmethod
+    def delete(self):
+        pass
+
 
 class LocalBackend(DataBackend):
     def __init__(self, dataset: Dataset, text_column_name: str, id_column_name: str) -> None:
@@ -52,6 +56,9 @@ class LocalBackend(DataBackend):
     def upsert(self, dataset: Dataset) -> None:
         self.dataset = concatenate_datasets([self.dataset, dataset])
         self.dataset.add_faiss_index('embedding')
+    
+    def delete(self) -> None:
+        return None
 
     def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         scores, samples = self.dataset.get_nearest_examples('embedding', embedding, k=k)
@@ -96,6 +103,9 @@ class PineconeBackend(DataBackend):
         
     def upsert(self, dataset: Dataset) -> None:
         self.dataset_upsert(dataset)
+    
+    def delete(self, ids: Iterable) -> None:
+        self.index.delete(ids)
 
     def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         embedding = embedding.tolist()
@@ -141,6 +151,9 @@ class ChromaBackend(DataBackend):
 
     def upsert(self, dataset: Dataset) -> None:
         self.dataset_upsert(dataset)
+
+    def delete(self, ids: Iterable) -> None:
+        self.collection.delete(ids)
 
     def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
         embedding = embedding.tolist()
