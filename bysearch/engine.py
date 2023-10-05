@@ -45,9 +45,9 @@ class BySearch:
         if backend == 'chroma':
             self.backend = ChromaBackend(dataset, text_column_name, **kwargs)
 
-    def add_data(self, dataset: Optional[Dataset] = None, path: str = None, compute_embeddings: bool = False) -> None:
+    def upsert(self, dataset: Optional[Dataset] = None, path: str = None, compute_embeddings: bool = False) -> None:
         dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
-        self.backend.add_data(dataset)
+        self.backend.upsert(dataset)
 
     def search(self, prompt: str, k: int = 5, verbose: bool = True) -> DataFrame:
         embedding = self.get_embedding([prompt])

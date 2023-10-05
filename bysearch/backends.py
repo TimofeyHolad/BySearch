@@ -19,7 +19,7 @@ def print_dataframe(df: DataFrame) -> None:
 
 class DataBackend(ABC):
     @abstractmethod
-    def add_data(self):
+    def upsert(self):
         pass
 
     @abstractmethod
@@ -37,7 +37,7 @@ class LocalBackend(DataBackend):
         self.column_names.insert(0, self.text_column_name)
         self.dataset.add_faiss_index('embedding')
         
-    def add_data(self, dataset: Dataset) -> None:
+    def upsert(self, dataset: Dataset) -> None:
         self.dataset = concatenate_datasets([self.dataset, dataset])
         self.dataset.add_faiss_index('embedding')
 
@@ -84,7 +84,7 @@ class PineconeBackend(DataBackend):
         if dataset is not None:
             self.dataset_upsert(dataset)
         
-    def add_data(self, dataset: Dataset) -> None:
+    def upsert(self, dataset: Dataset) -> None:
         self.dataset_upsert(dataset)
 
     def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
@@ -128,7 +128,7 @@ class ChromaBackend(DataBackend):
         if dataset is not None:
             self.dataset_upsert(dataset)
 
-    def add_data(self, dataset: Dataset) -> None:
+    def upsert(self, dataset: Dataset) -> None:
         self.dataset_upsert(dataset)
 
     def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
