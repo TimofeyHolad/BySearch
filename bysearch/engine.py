@@ -35,6 +35,7 @@ class BySearch:
 
     def __init__(self, dataset: Optional[Dataset] = None, path: Optional[str] = None, text_column_name: str = None, id_column_name: str = None, compute_embeddings: bool = False, tokenizer_checkpoint: str = "KoichiYasuoka/roberta-small-belarusian", model_path: str = 'onnx\\by-model.onnx', backend: str = 'local', **kwargs) -> None:
         self.text_column_name = text_column_name
+        self.id_column_name = id_column_name
         self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
         self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
         dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
