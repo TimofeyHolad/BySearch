@@ -7,7 +7,9 @@ import pandas as pd
 from pandas import DataFrame
 from datasets import concatenate_datasets, Dataset
 import pinecone
+from pinecone import ApiException
 import chromadb
+import json
 
 
 def print_dataframe(df: DataFrame) -> None:
@@ -71,10 +73,10 @@ class LocalBackend(DataBackend):
     
 
 class PineconeBackend(DataBackend):
-    def dataset_upsert(self, dataset: Dataset, upsert_minibatch_size: int = 1000, text_size: int = 100) -> None:
+    def dataset_upsert(self, dataset: Dataset, upsert_minibatch_size: int = 1000, text_size: int = 22000) -> None:
         # Check for text_size.
         # Pinecone has limitation for text size in metadata.
-        assert text_size < 20000, 'text_size should be less then 20000'
+        # assert text_size < 22000, 'text_size should be less then 22000'
         # Prepare column_names list in the way: [text_column_name, *metadata_column_names_without_embeddings]
         column_names = preprocess_column_names(dataset.column_names, self.text_column_name, self.id_column_name, drop_id_column_name=True)
         dataset_size = len(dataset)
@@ -86,7 +88,19 @@ class PineconeBackend(DataBackend):
             metadata_list = [data[column_name] for column_name in column_names]
             metadata = [{column_names[i]: (row[i][:text_size] if column_names[i] == self.text_column_name else row[i]) for i in range(len(row))} for row in zip(*metadata_list)]
             to_upsert = list(zip(ids, embeddings, metadata))
-            self.index.upsert(vectors=to_upsert, batch_size=upsert_minibatch_size)
+            try: 
+                self.index.upsert(vectors=to_upsert, batch_size=upsert_minibatch_size)
+            except ApiException as err:
+                body = err.body
+                # convert dict like string into a dict
+                body = json.loads(body)
+                code = body['code']
+                if code == 11:
+                    raise ValueError('Total size of the batch is too big.')
+                elif code == 3:
+                    raise ValueError('Total size of text and metadata is too big.')
+                else:
+                    raise err
 
     def __init__(self, dataset: Optional[Dataset] = None, text_column_name: str = None, id_column_name: str = None, upsert_batch_size: int = 50000, index_name: str = None, metric: str = 'euclidean', **kwargs) -> None:
         self.text_column_name = text_column_name
@@ -141,9 +155,9 @@ class ChromaBackend(DataBackend):
         self.upsert_batch_size = upsert_batch_size
         if type == 'ephemeral':
             client = chromadb.EphemeralClient(**kwargs)
-        if type == 'persistent':
+        elif type == 'persistent':
             client = chromadb.PersistentClient(**kwargs)
-        if type == 'http':
+        elif type == 'http':
             client = chromadb.HttpClient(**kwargs)
         self.collection = client.get_or_create_collection(collection_name)
         if dataset is not None:

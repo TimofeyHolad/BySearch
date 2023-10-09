@@ -41,9 +41,9 @@ class BySearch:
         dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
         if backend == 'local':
             self.backend = LocalBackend(dataset, text_column_name, id_column_name)
-        if backend == 'pinecone':
+        elif backend == 'pinecone':
             self.backend = PineconeBackend(dataset, text_column_name, id_column_name, **kwargs)
-        if backend == 'chroma':
+        elif backend == 'chroma':
             self.backend = ChromaBackend(dataset, text_column_name, id_column_name, **kwargs)
 
     def upsert(self, dataset: Optional[Dataset] = None, path: str = None, compute_embeddings: bool = False) -> None:
