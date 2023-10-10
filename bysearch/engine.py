@@ -13,15 +13,25 @@ class BySearch:
     def get_embedding(self, text_list: list[str]) -> NDArray[np.float64]:
         max_length = self.tokenizer.model_max_length - 1
         encoded_input = self.tokenizer(
-            text_list, padding='max_length', truncation=True, return_tensors="np", max_length=max_length, return_token_type_ids=False,
+            text_list, 
+            padding='max_length', 
+            truncation=True, 
+            return_tensors="np", 
+            max_length=max_length, 
+            return_token_type_ids=False,
+            return_overflowing_tokens=True,
         )
+        # Map each sample of tokens to corresponding input text index 
+        sample_to_text = encoded_input.pop('overflow_to_sample_mapping')
         encoded_input = {k: v.astype(dtype=np.int64) for k, v in encoded_input.items()}
-        model_output = self.session.run(None, input_feed=dict(encoded_input))
-        return model_output[0][:, 0]
-    
-    def map_embedding(self, data_dict: dict[str, list[Any]]) -> dict[str, NDArray[np.float64]]:
-        text_list = data_dict['text']
-        return {'embedding': self.get_embedding(text_list)}
+        last_hidden_states, _ = self.session.run(None, input_feed=dict(encoded_input))
+        # Get last hidden states grouped by input text 
+        sections = np.unique(sample_to_text, return_index=True)[1][1:]
+        grouped_last_hidden_states = np.split(last_hidden_states, sections)
+        # Aggregate cls tokens in each group
+        aggregated_cls_tokens = [np.mean(group[:, 0, :], axis=0) for group in grouped_last_hidden_states]
+        aggregated_cls_tokens = np.array(aggregated_cls_tokens)
+        return aggregated_cls_tokens
 
     def load_dataset(self, dataset: Optional[Dataset] = None, path: Optional[str] = None, compute_embeddings: bool = False, batch_size: int = 2) -> Dataset:
         if path is not None:
@@ -38,7 +48,7 @@ class BySearch:
         self.text_column_name = text_column_name
         self.id_column_name = id_column_name
         self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
-        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+        self.session = ort.InferenceSession(model_path, providers=['CUDAExecutionProvider'])
         dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
         if backend == 'local':
             self.backend = LocalBackend(dataset, text_column_name, id_column_name)
