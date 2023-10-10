@@ -48,7 +48,7 @@ class BySearch:
         self.text_column_name = text_column_name
         self.id_column_name = id_column_name
         self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
-        self.session = ort.InferenceSession(model_path, providers=['CUDAExecutionProvider'])
+        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
         dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
         if backend == 'local':
             self.backend = LocalBackend(dataset, text_column_name, id_column_name)
