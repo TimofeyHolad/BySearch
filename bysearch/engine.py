@@ -11,8 +11,9 @@ from .backends import LocalBackend, PineconeBackend, ChromaBackend
 
 class BySearch:
     def get_embedding(self, text_list: list[str]) -> NDArray[np.float64]:
+        max_length = self.tokenizer.model_max_length - 1
         encoded_input = self.tokenizer(
-            text_list, padding='max_length', truncation=True, return_tensors="np", max_length=64, return_token_type_ids=False,
+            text_list, padding='max_length', truncation=True, return_tensors="np", max_length=max_length, return_token_type_ids=False,
         )
         encoded_input = {k: v.astype(dtype=np.int64) for k, v in encoded_input.items()}
         model_output = self.session.run(None, input_feed=dict(encoded_input))
@@ -33,7 +34,7 @@ class BySearch:
             )
         return dataset
 
-    def __init__(self, dataset: Optional[Dataset] = None, path: Optional[str] = None, text_column_name: str = None, id_column_name: str = None, compute_embeddings: bool = False, tokenizer_checkpoint: str = "KoichiYasuoka/roberta-small-belarusian", model_path: str = 'onnx\\by-model.onnx', backend: str = 'local', **kwargs) -> None:
+    def __init__(self, dataset: Optional[Dataset] = None, path: Optional[str] = None, text_column_name: str = None, id_column_name: str = None, compute_embeddings: bool = False, tokenizer_checkpoint: str = "KoichiYasuoka/roberta-small-belarusian", model_path: str = 'onnx\\model.onnx', backend: str = 'local', **kwargs) -> None:
         self.text_column_name = text_column_name
         self.id_column_name = id_column_name
         self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)

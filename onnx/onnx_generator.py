@@ -7,14 +7,16 @@ from onnxruntime import InferenceSession
 checkpoint = 'KoichiYasuoka/roberta-small-belarusian'
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 model = AutoModel.from_pretrained(checkpoint)
+max_length = tokenizer.model_max_length - 1
 
 # get input for models and torch model output
 input = tokenizer(
-    ['аповесць беларускага пісьменніка Уладзіміра Караткевіча', 'аповесць беларускага пісьменніка Уладзіміра Караткевіча'], 
+    ['На скрыжаванні сцяжын воўчых і чалавечых крывёй набрыняў бурштын і лютасцю сярэднявечча, і смокчуць бурштын смаўжы, каўтаюць смаўжоў гадзюкі, аб косткі каля сцяжын гайвораны гойстраць дзюбкі. Адсечаная галава — пакоціцца долу поўня, ваўкоў прывядзе сава, ахрышчаная Ваўкоўняй. Насустрач з глухіх сцяжын людзей прывядзе паходня: драпежных на кроў жанчын, на славу мужчын галодных. Патушыць паходню жах, завыюць ваўкі і людзі, і ў іхніх шкляных вачах людскога цяпла не будзе — на скрыжаванні сцяжын воўчых і чалавечых крывёй набрыняў бурштын і лютасцю сярэднявечча, і смокчуць бурштын смаўжы, каб выжыць — гадуюць рогі, і косткі, нібы нажы, вандроўнікам раняць ногі.', 'аповесць беларускага пісьменніка Уладзіміра Караткевіча'], 
     return_tensors='pt', 
     return_token_type_ids=False,
     padding='max_length',
-    max_length=64
+    truncation=True,
+    max_length=max_length,
 )
 torch_output = model(**input)
 
@@ -22,7 +24,7 @@ torch_output = model(**input)
 torch.onnx.export(
     model=model,
     args=tuple(input.values()),
-    f='onnx\\by-model.onnx',
+    f='onnx\\model.onnx',
     input_names=list(input.keys()),
     output_names=list(torch_output.keys()),
     dynamic_axes={
@@ -34,7 +36,7 @@ torch.onnx.export(
 )
 
 # inference of onnx model
-session = InferenceSession('onnx\\by-model.onnx', providers=['CPUExecutionProvider'])
+session = InferenceSession('onnx\\model.onnx', providers=['CPUExecutionProvider'])
 onnx_output = session.run(
     None,
     {k: v.numpy() for k, v in input.items()},
