@@ -3,6 +3,7 @@ import numpy as np
 from numpy.typing import NDArray
 from transformers import AutoTokenizer
 from datasets import load_from_disk, Dataset
+import torch
 import onnxruntime as ort
 from pandas import DataFrame
 
@@ -21,35 +22,58 @@ class BySearch:
             return_token_type_ids=False,
             return_overflowing_tokens=True,
         )
-        # Map each sample of tokens to corresponding input text index 
+        # Get map array from each sample of tokens to corresponding input text index 
         sample_to_text = encoded_input.pop('overflow_to_sample_mapping')
+        # Cast each tokenizer output array to np.int64 for ONNX inference
         encoded_input = {k: v.astype(dtype=np.int64) for k, v in encoded_input.items()}
         last_hidden_states, _ = self.session.run(None, input_feed=dict(encoded_input))
         # Get last hidden states grouped by input text 
         sections = np.unique(sample_to_text, return_index=True)[1][1:]
         grouped_last_hidden_states = np.split(last_hidden_states, sections)
-        # Aggregate cls tokens in each group
+        # Aggregate CLS tokens in each group
         aggregated_cls_tokens = [np.mean(group[:, 0, :], axis=0) for group in grouped_last_hidden_states]
         aggregated_cls_tokens = np.array(aggregated_cls_tokens)
         return aggregated_cls_tokens
 
-    def load_dataset(self, dataset: Optional[Dataset] = None, path: Optional[str] = None, compute_embeddings: bool = False, batch_size: int = 2) -> Dataset:
+    def load_dataset(
+        self, 
+        dataset: Optional[Dataset] = None, 
+        path: Optional[str] = None, 
+        compute_embeddings: bool = False, 
+        batch_size: int = 2
+    ) -> Dataset:
+        # Load dataset from path if possible
         if path is not None:
             dataset = load_from_disk(path)
+        # Compute embeddings from text column if necessary 
         if compute_embeddings:
             dataset = dataset.map(
                 lambda x: {"embedding": self.get_embedding(x[self.text_column_name])}, 
                 batched=True,
-                batch_size=batch_size, 
+                batch_size=batch_size,
             )
         return dataset
 
-    def __init__(self, dataset: Optional[Dataset] = None, path: Optional[str] = None, text_column_name: str = None, id_column_name: str = None, compute_embeddings: bool = False, tokenizer_checkpoint: str = "KoichiYasuoka/roberta-small-belarusian", model_path: str = 'onnx\\model.onnx', backend: str = 'local', **kwargs) -> None:
+    def __init__(
+        self, 
+        dataset: Optional[Dataset] = None, 
+        path: Optional[str] = None, 
+        text_column_name: str = None, 
+        id_column_name: str = None, 
+        compute_embeddings: bool = False, 
+        tokenizer_checkpoint: str = "KoichiYasuoka/roberta-small-belarusian", 
+        model_path: str = 'onnx\\model.onnx', 
+        backend: str = 'local', 
+        **kwargs
+    ) -> None:
+        
         self.text_column_name = text_column_name
         self.id_column_name = id_column_name
         self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
-        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+        self.session = ort.InferenceSession(model_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+        # Load and/or preprocess dataset
         dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
+        # Create backend for required database
         if backend == 'local':
             self.backend = LocalBackend(dataset, text_column_name, id_column_name)
         elif backend == 'pinecone':
