@@ -1,40 +1,13 @@
-from typing import Optional, Any, Iterable
-import numpy as np
-from numpy.typing import NDArray
-from transformers import AutoTokenizer
+from typing import Iterable
 from datasets import load_from_disk, Dataset
 import torch
 import onnxruntime as ort
 from pandas import DataFrame
 
 from .backends import LocalBackend, PineconeBackend, ChromaBackend
-
+from .pipelines import EmbeddingsPipeline, ONNXPipeline
 
 class BySearch:
-    def get_embedding(self, text_list: list[str]) -> NDArray[np.float64]:
-        max_length = self.tokenizer.model_max_length - 1
-        encoded_input = self.tokenizer(
-            text_list, 
-            padding='max_length', 
-            truncation=True, 
-            return_tensors="np", 
-            max_length=max_length, 
-            return_token_type_ids=False,
-            return_overflowing_tokens=True,
-        )
-        # Get map array from each sample of tokens to corresponding input text index 
-        sample_to_text = encoded_input.pop('overflow_to_sample_mapping')
-        # Cast each tokenizer output array to np.int64 for ONNX inference
-        encoded_input = {k: v.astype(dtype=np.int64) for k, v in encoded_input.items()}
-        last_hidden_states, _ = self.session.run(None, input_feed=dict(encoded_input))
-        # Get last hidden states grouped by input text 
-        sections = np.unique(sample_to_text, return_index=True)[1][1:]
-        grouped_last_hidden_states = np.split(last_hidden_states, sections)
-        # Aggregate CLS tokens in each group
-        aggregated_cls_tokens = [np.mean(group[:, 0, :], axis=0) for group in grouped_last_hidden_states]
-        aggregated_cls_tokens = np.array(aggregated_cls_tokens)
-        return aggregated_cls_tokens
-
     def load_dataset(
         self, 
         dataset: Dataset | DataFrame = None, 
@@ -49,7 +22,7 @@ class BySearch:
         # Compute embeddings from text column if necessary 
         if compute_embeddings:
             dataset = dataset.map(
-                lambda x: {"embedding": self.get_embedding(x[self.text_column_name])}, 
+                lambda x: {"embedding": self.pipeline(x[self.text_column_name])}, 
                 batched=True,
                 batch_size=batch_size,
             )
@@ -60,20 +33,19 @@ class BySearch:
         dataset: Dataset | DataFrame = None, 
         text_column_name: str = None, 
         id_column_name: str = None, 
-        compute_embeddings: bool = False, 
-        tokenizer_checkpoint: str = "KoichiYasuoka/roberta-small-belarusian", 
-        model_path: str = 'onnx\\model.onnx', 
+        compute_embeddings: bool = True, 
+        pipeline: EmbeddingsPipeline = None,
         backend: str = 'local', 
         **kwargs
     ) -> None:
         
         self.text_column_name = text_column_name
         self.id_column_name = id_column_name
-        self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
-        self.session = ort.InferenceSession(model_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+        self.pipeline = pipeline
         # Load and/or preprocess dataset
         dataset = self.load_dataset(dataset, compute_embeddings=compute_embeddings)
         # Create backend for required database
+        # TODO pass DataBackend argumentz
         if backend == 'local':
             self.backend = LocalBackend(dataset, text_column_name, id_column_name)
         elif backend == 'pinecone':
@@ -81,7 +53,7 @@ class BySearch:
         elif backend == 'chroma':
             self.backend = ChromaBackend(dataset, text_column_name, id_column_name, **kwargs)
 
-    def upsert(self, dataset: Dataset | DataFrame = None, compute_embeddings: bool = False) -> None:
+    def upsert(self, dataset: Dataset | DataFrame = None, compute_embeddings: bool = True) -> None:
         dataset = self.load_dataset(dataset, compute_embeddings=compute_embeddings)
         self.backend.upsert(dataset)
 
@@ -89,5 +61,5 @@ class BySearch:
         self.backend.delete(ids)
 
     def search(self, prompt: str, k: int = 5, verbose: bool = True) -> DataFrame:
-        embedding = self.get_embedding([prompt])
+        embedding = self.pipeline([prompt])
         return self.backend.search(embedding, k, verbose)
