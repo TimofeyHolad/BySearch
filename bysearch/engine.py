@@ -81,7 +81,7 @@ class BySearch:
         elif backend == 'chroma':
             self.backend = ChromaBackend(dataset, text_column_name, id_column_name, **kwargs)
 
-    def upsert(self, dataset: Optional[Dataset] = None, compute_embeddings: bool = False) -> None:
+    def upsert(self, dataset: Dataset | DataFrame = None, compute_embeddings: bool = False) -> None:
         dataset = self.load_dataset(dataset, compute_embeddings=compute_embeddings)
         self.backend.upsert(dataset)
 
