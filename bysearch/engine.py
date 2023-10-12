@@ -37,14 +37,15 @@ class BySearch:
 
     def load_dataset(
         self, 
-        dataset: Optional[Dataset] = None, 
-        path: Optional[str] = None, 
-        compute_embeddings: bool = False, 
+        dataset: Dataset | DataFrame = None, 
+        compute_embeddings: bool = True, 
         batch_size: int = 2
     ) -> Dataset:
-        # Load dataset from path if possible
-        if path is not None:
-            dataset = load_from_disk(path)
+        # Convert dataset to HuggingFace Dataset if it is pandas DataFrame 
+        try: 
+            dataset = Dataset.from_pandas(dataset)
+        except:
+            pass
         # Compute embeddings from text column if necessary 
         if compute_embeddings:
             dataset = dataset.map(
@@ -56,8 +57,7 @@ class BySearch:
 
     def __init__(
         self, 
-        dataset: Optional[Dataset] = None, 
-        path: Optional[str] = None, 
+        dataset: Dataset | DataFrame = None, 
         text_column_name: str = None, 
         id_column_name: str = None, 
         compute_embeddings: bool = False, 
@@ -72,7 +72,7 @@ class BySearch:
         self.tokenizer  = AutoTokenizer.from_pretrained(tokenizer_checkpoint)
         self.session = ort.InferenceSession(model_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
         # Load and/or preprocess dataset
-        dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
+        dataset = self.load_dataset(dataset, compute_embeddings=compute_embeddings)
         # Create backend for required database
         if backend == 'local':
             self.backend = LocalBackend(dataset, text_column_name, id_column_name)
@@ -81,8 +81,8 @@ class BySearch:
         elif backend == 'chroma':
             self.backend = ChromaBackend(dataset, text_column_name, id_column_name, **kwargs)
 
-    def upsert(self, dataset: Optional[Dataset] = None, path: str = None, compute_embeddings: bool = False) -> None:
-        dataset = self.load_dataset(dataset, path, compute_embeddings=compute_embeddings)
+    def upsert(self, dataset: Optional[Dataset] = None, compute_embeddings: bool = False) -> None:
+        dataset = self.load_dataset(dataset, compute_embeddings=compute_embeddings)
         self.backend.upsert(dataset)
 
     def delete(self, ids: Iterable) -> None:
