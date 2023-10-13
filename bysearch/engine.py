@@ -1,10 +1,10 @@
-from typing import Iterable
+from typing import Iterable, Optional
 from datasets import load_from_disk, Dataset
 import torch
 import onnxruntime as ort
 from pandas import DataFrame
 
-from .backends import LocalBackend, PineconeBackend, ChromaBackend
+from .backends import DataBackend, LocalBackend, PineconeBackend, ChromaBackend
 from .pipelines import EmbeddingsPipeline, ONNXPipeline
 
 class BySearch:
@@ -30,28 +30,17 @@ class BySearch:
 
     def __init__(
         self, 
-        dataset: Dataset | DataFrame = None, 
-        text_column_name: str = None, 
-        id_column_name: str = None, 
+        pipeline: EmbeddingsPipeline,
+        backend: DataBackend, 
+        dataset: Optional[Dataset | DataFrame] = None, 
         compute_embeddings: bool = True, 
-        pipeline: EmbeddingsPipeline = None,
-        backend: str = 'local', 
-        **kwargs
     ) -> None:
-        
-        self.text_column_name = text_column_name
-        self.id_column_name = id_column_name
         self.pipeline = pipeline
+        self.backend = backend
         # Load and/or preprocess dataset
-        dataset = self.load_dataset(dataset, compute_embeddings=compute_embeddings)
-        # Create backend for required database
-        # TODO pass DataBackend argumentz
-        if backend == 'local':
-            self.backend = LocalBackend(dataset, text_column_name, id_column_name)
-        elif backend == 'pinecone':
-            self.backend = PineconeBackend(dataset, text_column_name, id_column_name, **kwargs)
-        elif backend == 'chroma':
-            self.backend = ChromaBackend(dataset, text_column_name, id_column_name, **kwargs)
+        if dataset is not None:
+            dataset = self.load_dataset(dataset, compute_embeddings=compute_embeddings)
+            self.backend.upsert(dataset)
 
     def upsert(self, dataset: Dataset | DataFrame = None, compute_embeddings: bool = True) -> None:
         dataset = self.load_dataset(dataset, compute_embeddings=compute_embeddings)
