@@ -1,3 +1,4 @@
+from typing import Optional
 from abc import ABC, abstractmethod
 from typing import Any
 import numpy as np
@@ -14,10 +15,10 @@ class EmbeddingsPipeline(ABC):
 
 
 class ONNXPipeline(EmbeddingsPipeline):
-    def __init__(self, tokenizer, onnx_model, max_context_length) -> None:
+    def __init__(self, tokenizer, onnx_model: ort.InferenceSession | str, max_context_length: Optional[int] = None) -> None:
         # Try to load tokenizer in case tokenizer variable contains tokenizer path in HuggingFace hub
         try:
-            tokenizer = AutoTokenizer.from_pretrained(tokenizer, )
+            tokenizer = AutoTokenizer.from_pretrained(tokenizer)
         except:
             pass
         self.tokenizer = tokenizer
@@ -26,9 +27,9 @@ class ONNXPipeline(EmbeddingsPipeline):
         except: 
             pass
         self.onnx_model = onnx_model
-        # TODO condition for max_context_length
-        self.max_context_length = tokenizer.model_max_length
         self.max_context_length = max_context_length
+        if self.max_context_length is None:
+            self.max_context_length = tokenizer.model_max_length
 
     def __call__(self, text_list: list[str]) -> NDArray[np.float64]:
         encoded_input = self.tokenizer(

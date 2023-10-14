@@ -14,7 +14,7 @@ class BySearch:
         compute_embeddings: bool = True, 
         batch_size: int = 2
     ) -> Dataset:
-        # Convert dataset to HuggingFace Dataset if it is pandas DataFrame 
+        # Convert dataset to HuggingFace Dataset in case it is pandas DataFrame 
         try: 
             dataset = Dataset.from_pandas(dataset)
         except:
@@ -22,7 +22,7 @@ class BySearch:
         # Compute embeddings from text column if necessary 
         if compute_embeddings:
             dataset = dataset.map(
-                lambda x: {"embedding": self.pipeline(x[self.text_column_name])}, 
+                lambda x: {"embedding": self.pipeline(x[self.backend.text_column_name])}, 
                 batched=True,
                 batch_size=batch_size,
             )
@@ -39,8 +39,7 @@ class BySearch:
         self.backend = backend
         # Load and/or preprocess dataset
         if dataset is not None:
-            dataset = self.load_dataset(dataset, compute_embeddings=compute_embeddings)
-            self.backend.upsert(dataset)
+            self.upsert(dataset, compute_embeddings=compute_embeddings)
 
     def upsert(self, dataset: Dataset | DataFrame = None, compute_embeddings: bool = True) -> None:
         dataset = self.load_dataset(dataset, compute_embeddings=compute_embeddings)
