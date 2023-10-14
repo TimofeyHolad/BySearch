@@ -1,3 +1,3 @@
-from .engine import BySearch
+from .engine import Engine
 from .backends import *
 from .pipelines import *

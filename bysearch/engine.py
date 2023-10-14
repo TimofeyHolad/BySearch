@@ -7,7 +7,7 @@ from pandas import DataFrame
 from .backends import DataBackend, LocalBackend, PineconeBackend, ChromaBackend
 from .pipelines import EmbeddingsPipeline, ONNXPipeline
 
-class BySearch:
+class Engine:
     def load_dataset(
         self, 
         dataset: Dataset | DataFrame = None, 
