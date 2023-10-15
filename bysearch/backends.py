@@ -1,9 +1,8 @@
-from typing import Optional, Iterable
+from typing import Iterable
 import math
 from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import NDArray
-import pandas as pd
 from pandas import DataFrame
 from datasets import concatenate_datasets, Dataset
 import pinecone

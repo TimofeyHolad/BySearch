@@ -1,11 +1,9 @@
 from typing import Iterable, Optional
-from datasets import load_from_disk, Dataset
-import torch
-import onnxruntime as ort
+from datasets import Dataset
 from pandas import DataFrame
 
-from .backends import DataBackend, LocalBackend, PineconeBackend, ChromaBackend
-from .pipelines import EmbeddingsPipeline, ONNXPipeline
+from .backends import DataBackend
+from .pipelines import EmbeddingsPipeline
 
 class Engine:
     def load_dataset(
