@@ -31,7 +31,7 @@ class Engine:
         pipeline: EmbeddingsPipeline,
         backend: DataBackend, 
         dataset: Optional[Dataset | DataFrame] = None, 
-        compute_embeddings: bool = True, 
+        compute_embeddings: Optional[bool] = True, 
     ) -> None:
         self.pipeline = pipeline
         self.backend = backend

@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Optional
 import math
 from abc import ABC, abstractmethod
 import numpy as np
@@ -12,13 +12,29 @@ import json
 
 
 def print_dataframe(df: DataFrame) -> None:
+    '''Print dataframe row by row with column name for each value.'''
     for _, row in df.iterrows():
         print(144 * '-')
         for column in df.columns:
             print('{}: {}'.format(column, row[column]))
 
 
-def preprocess_column_names(column_names: list[str], text_column_name: str, id_column_name: str, drop_text_column_name: bool = False, drop_embedding_column_name: bool = True, drop_id_column_name: bool = False) -> list[str]:
+def preprocess_column_names(
+    column_names: list[str], 
+    text_column_name: str, 
+    id_column_name: str, 
+    drop_text_column_name: bool = False, 
+    drop_embedding_column_name: bool = True, 
+    drop_id_column_name: bool = False
+) -> list[str]:
+    '''
+    Place column_names list in the order: 
+    (id_column_name, embeddings, text_column_name, *other_columns_in_the_same_order).
+    This function is used to ensure right columns order during upsert operation into
+    different data bases with different storage formats.
+    It is also used during dataframe formation in search function to provide right
+    order of dataframe columns.
+    '''
     column_names = column_names.copy()
     column_names.remove('embedding')
     column_names.remove(text_column_name)
@@ -32,6 +48,7 @@ def preprocess_column_names(column_names: list[str], text_column_name: str, id_c
     return column_names
 
 
+# Abstract class for backend classes inheritance 
 class DataBackend(ABC):
     @abstractmethod
     def upsert(self):
@@ -46,7 +63,7 @@ class DataBackend(ABC):
         pass
 
 
-class LocalBackend(DataBackend):
+class DatasetBackend(DataBackend):
     def __init__(self, text_column_name: str, id_column_name: str) -> None:
         self.dataset = None
         self.text_column_name = text_column_name
@@ -74,20 +91,20 @@ class LocalBackend(DataBackend):
     
 
 class PineconeBackend(DataBackend):
-    def dataset_upsert(self, dataset: Dataset, upsert_minibatch_size: int = 100, text_size: int = 22000) -> None:
-        # Check for text_size.
-        # Pinecone has limitation for text size in metadata.
-        # assert text_size < 22000, 'text_size should be less then 22000'
+    def dataset_upsert(self, dataset: Dataset, upsert_minibatch_size: int = 100) -> None:
         # Prepare column_names list in the way: [text_column_name, *metadata_column_names_without_embeddings]
         column_names = preprocess_column_names(dataset.column_names, self.text_column_name, self.id_column_name, drop_id_column_name=True)
         dataset_size = len(dataset)
         for batch_start in range(0, dataset_size, self.upsert_batch_size):
             batch_end = min(batch_start + self.upsert_batch_size, dataset_size)
             data = dataset[batch_start: batch_end] 
-            ids = [str(id)[:512] for id in data[self.id_column_name]]
+            ids = [str(id) for id in data[self.id_column_name]]
             embeddings = data['embedding']
             metadata_list = [data[column_name] for column_name in column_names]
-            metadata = [{column_names[i]: (row[i][:text_size] if column_names[i] == self.text_column_name else row[i]) for i in range(len(row))} for row in zip(*metadata_list)]
+            # TODO metadata dict with column names indices
+            if self.max_text_size:
+                metadata_list[0] = [text[:self.max_text_size] for text in metadata_list[0]]
+            metadata = [{column_names[i]: row[i] for i in range(len(row))} for row in zip(*metadata_list)]
             to_upsert = list(zip(ids, embeddings, metadata))
             try: 
                 self.index.upsert(vectors=to_upsert, batch_size=upsert_minibatch_size)
@@ -97,19 +114,20 @@ class PineconeBackend(DataBackend):
                 body = json.loads(body)
                 code = body['code']
                 if code == 11:
-                    raise ValueError('Total size of the batch is too big.')
+                    raise ValueError('Total size of the metadata in the batch is too big. Pinecone has limits for bytes per batch, try to truncate long texts or to drop unnecessary columns.')
                 elif code == 3:
-                    raise ValueError('Total size of text and metadata is too big.')
+                    raise ValueError('Total size of the metadata in the row is too big. Pinecone has limits for bytes per batch, try to truncate long texts or to drop unnecessary columns.')
                 else:
                     raise err
 
-    def __init__(self, text_column_name: str = None, id_column_name: str = None, upsert_batch_size: int = 50000, index_name: str = None, metric: str = 'euclidean', **kwargs) -> None:
+    def __init__(self, text_column_name: str = None, id_column_name: str = None, upsert_batch_size: int = 50000, max_text_size: Optional[int] = None, index_name: str = None, metric: Optional[str] = 'euclidean', **kwargs) -> None:
         self.text_column_name = text_column_name
         self.id_column_name = id_column_name
         self.upsert_batch_size = upsert_batch_size
+        self.max_text_size = max_text_size
         self.index_name = index_name
         self.metric = metric
-        pinecone.init(**kwargs, )
+        pinecone.init(**kwargs)
         self.index = None
         if index_name in pinecone.list_indexes():
             self.index = pinecone.Index(index_name)
