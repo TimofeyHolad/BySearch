@@ -47,8 +47,7 @@ def preprocess_column_names(
         column_names.insert(0, id_column_name)
     return column_names
 
-
-# Abstract class for backend classes inheritance 
+ 
 class DataBackend(ABC):
     @abstractmethod
     def upsert(self):

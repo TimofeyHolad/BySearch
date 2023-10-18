@@ -1,11 +1,14 @@
 from typing import Optional
 from abc import ABC, abstractmethod
-from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 import torch
 import onnxruntime as ort
 from transformers import AutoTokenizer, AutoModel
+from optimum.exporters.onnx import main_export
+from optimum.onnxruntime import ORTModel
+
+from .utils import onnx_exporter
 
 
 def aggregate_embeddings(last_hidden_states: NDArray[np.float32 | np.float64], last_hidden_state_to_text: NDArray[np.intc]) -> NDArray[np.float32 | np.float64]:
@@ -25,7 +28,7 @@ class EmbeddingsPipeline(ABC):
 
 
 class HuggingFacePipeline(EmbeddingsPipeline):
-    def __init__(self, tokenizer, model, device, max_context_length: Optional[int] = None) -> None:
+    def __init__(self, model, tokenizer, device, max_context_length: Optional[int] = None) -> None:
         self.device = device
         # Try to load tokenizer in case tokenizer variable contains tokenizer HuggingFace hub path
         try:
@@ -39,9 +42,9 @@ class HuggingFacePipeline(EmbeddingsPipeline):
         except: 
             pass
         self.model = model.to(device)
+        if not max_context_length:
+            max_context_length = tokenizer.model_max_length
         self.max_context_length = max_context_length
-        if self.max_context_length is None:
-            self.max_context_length = tokenizer.model_max_length
 
     def __call__(self, text_list: list[str]) -> NDArray[np.float64]:
         encoded_input = self.tokenizer(
@@ -64,7 +67,7 @@ class HuggingFacePipeline(EmbeddingsPipeline):
         return aggregated_cls_embeddings
 
 class ONNXPipeline(EmbeddingsPipeline):
-    def __init__(self, tokenizer, onnx_model: ort.InferenceSession | str, max_context_length: Optional[int] = None) -> None:
+    def __init__(self, onnx_model: ort.InferenceSession | str, tokenizer, max_context_length: Optional[int] = None) -> None:
         # Try to load tokenizer in case tokenizer variable contains tokenizer HuggingFace hub path
         try:
             tokenizer = AutoTokenizer.from_pretrained(tokenizer)
@@ -77,9 +80,28 @@ class ONNXPipeline(EmbeddingsPipeline):
         except: 
             pass
         self.onnx_model = onnx_model
+        if not max_context_length:
+            max_context_length = tokenizer.model_max_length
         self.max_context_length = max_context_length
-        if self.max_context_length is None:
-            self.max_context_length = tokenizer.model_max_length
+
+    @staticmethod
+    def from_hugging_face(model, tokenizer, onnx_save_path, dummy_input, max_context_length: Optional[int] = None, opset_version: int = 13):
+        # Try to load tokenizer in case tokenizer variable contains tokenizer HuggingFace hub path
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(tokenizer)
+        except:
+            pass
+        # Try to load ONNX session in case onnx_model variable contains local path
+        try:
+            model = AutoModel.from_pretrained(model)
+        except: 
+            pass
+        if not max_context_length:
+            max_context_length = tokenizer.model_max_length
+        # TODO check for file and forced update
+        onnx_exporter(model, tokenizer, onnx_save_path, max_context_length, dummy_input, opset_version)
+        onnx_model = ort.InferenceSession(onnx_save_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+        return ONNXPipeline(onnx_model, tokenizer, max_context_length)
 
     def __call__(self, text_list: list[str]) -> NDArray[np.float64]:
         encoded_input = self.tokenizer(
@@ -95,8 +117,8 @@ class ONNXPipeline(EmbeddingsPipeline):
         sample_to_text = encoded_input.pop('overflow_to_sample_mapping')
         # Cast each tokenizer output array to np.int64 for ONNX inference and run session
         encoded_input = {k: v.astype(dtype=np.int64) for k, v in encoded_input.items()}
-        last_hidden_states, _ = self.onnx_model.run(None, input_feed=dict(encoded_input))
+        # TODO outputs unpacking 
+        last_hidden_states = self.onnx_model.run(None, input_feed=dict(encoded_input))[0]
         # Aggregate all cls token last hidden states by texts 
         aggregated_cls_embeddings = aggregate_embeddings(last_hidden_states, last_hidden_state_to_text=sample_to_text)
         return aggregated_cls_embeddings
-    
