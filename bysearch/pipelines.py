@@ -28,8 +28,13 @@ class EmbeddingsPipeline(ABC):
 
 
 class HuggingFacePipeline(EmbeddingsPipeline):
-    def __init__(self, model, tokenizer, device, max_context_length: Optional[int] = None) -> None:
+    def __init__(self, model, tokenizer = None, device: str = 'cuda', max_context_length: Optional[int] = None) -> None:
         self.device = device
+        if not tokenizer:
+            if not isinstance(model, str):
+                raise ValueError("Tokenizer parameter can be not specified only in case model parameter contains Hugging Face path.")
+            tokenizer = model
+        
         # Try to load tokenizer in case tokenizer variable contains tokenizer HuggingFace hub path
         try:
             tokenizer = AutoTokenizer.from_pretrained(tokenizer)
@@ -85,7 +90,11 @@ class ONNXPipeline(EmbeddingsPipeline):
         self.max_context_length = max_context_length
 
     @staticmethod
-    def from_hugging_face(model, tokenizer, onnx_save_path, dummy_input, max_context_length: Optional[int] = None, opset_version: int = 13):
+    def from_hugging_face(model, tokenizer = None, onnx_save_path: str = 'onnx.model', dummy_input: str = None, max_context_length: Optional[int] = None, opset_version: int = 13):
+        if not tokenizer:
+            if not isinstance(model, str):
+                raise ValueError("Tokenizer parameter can be not specified only in case model parameter contains Hugging Face path.")
+            tokenizer = model
         # Try to load tokenizer in case tokenizer variable contains tokenizer HuggingFace hub path
         try:
             tokenizer = AutoTokenizer.from_pretrained(tokenizer)
