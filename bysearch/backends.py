@@ -76,7 +76,7 @@ class DatasetBackend(DataBackend):
             self.dataset = concatenate_datasets([self.dataset, dataset])
         self.dataset.add_faiss_index('embedding')
     
-    def delete(self) -> None:
+    def delete(self, ids: Iterable) -> None:
         return None
 
     def search(self, embedding: NDArray[np.float64], k: int, verbose: bool) -> DataFrame:
