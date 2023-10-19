@@ -5,8 +5,6 @@ from numpy.typing import NDArray
 import torch
 import onnxruntime as ort
 from transformers import AutoTokenizer, AutoModel
-from optimum.exporters.onnx import main_export
-from optimum.onnxruntime import ORTModel
 
 from .utils import onnx_exporter
 
