@@ -29,5 +29,4 @@ pipeline = ONNXPipeline.from_hugging_face(
 engine = Engine(dataset=dataset, pipeline=pipeline, backend=backend)
 result = engine.search('аповесць беларускага пісьменніка Уладзіміра Караткевіча', verbose=False)
 print(result)
-print()
 ```
