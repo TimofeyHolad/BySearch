@@ -88,7 +88,7 @@ class ONNXPipeline(EmbeddingsPipeline):
         self.max_context_length = max_context_length
 
     @staticmethod
-    def from_hugging_face(model, tokenizer = None, onnx_save_path: str = 'onnx.model', dummy_input: str = None, max_context_length: Optional[int] = None, opset_version: int = 13):
+    def from_hugging_face(model, tokenizer = None, onnx_save_path: str = 'onnx.model', dummy_input: str = None, max_context_length: Optional[int] = None, opset_version: int = 13, verbose=False):
         if not tokenizer:
             if not isinstance(model, str):
                 raise ValueError("Tokenizer parameter can be not specified only in case model parameter contains Hugging Face path.")
@@ -106,7 +106,9 @@ class ONNXPipeline(EmbeddingsPipeline):
         if not max_context_length:
             max_context_length = tokenizer.model_max_length
         # TODO check for file and forced update
-        onnx_exporter(model, tokenizer, onnx_save_path, max_context_length, dummy_input, opset_version)
+        error = onnx_exporter(model, tokenizer, onnx_save_path, max_context_length, dummy_input, opset_version)
+        if verbose:
+            print(f'Conversion error: {error}')
         onnx_model = ort.InferenceSession(onnx_save_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
         return ONNXPipeline(onnx_model, tokenizer, max_context_length)
 
