@@ -26,4 +26,4 @@ engine = Engine(dataset=dataset, pipeline=pipeline, backend=backend)
 result = engine.search('Your prompt', verbose=False)
 print(result)
 ```
-Other complex exemples are available [here](https://github.com/tiholad/BySearch/blob/main/demo%20EN.ipynb). 
+Other complex examples are available [here](https://github.com/tiholad/BySearch/blob/main/demo%20EN.ipynb). 
