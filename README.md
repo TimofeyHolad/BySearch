@@ -16,9 +16,8 @@ from bysearch.backends import ChromaBackend
 
 # Open your data as Pandas DataFrame
 dataset = pd.DataFrame()
-dataset = dataset.add_column('id', list(range(len(dataset))))
 # Create vector storage backend
-backend = DatasetBackend(text_column_name='your_text_column_name', id_column_name='id')
+backend = DatasetBackend(text_column_name='your_text_column_name', id_column_name='your_id_column_name')
 # Create text processing pipeline
 pipeline = HuggingFacePipeline(model='hugging_face_model_path')
 # Create engine using pipeline and backend, upsert your data
