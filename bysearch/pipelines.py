@@ -106,7 +106,7 @@ class ONNXPipeline(EmbeddingsPipeline):
         if not max_context_length:
             max_context_length = tokenizer.model_max_length
         # TODO check for file and forced update
-        error = onnx_exporter(model, tokenizer, onnx_save_path, max_context_length, dummy_input, opset_version)
+        error = onnx_exporter(model, tokenizer, onnx_save_path, max_context_length, opset_version, dummy_input)
         if verbose:
             print(f'Conversion error: {error}')
         onnx_model = ort.InferenceSession(onnx_save_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
