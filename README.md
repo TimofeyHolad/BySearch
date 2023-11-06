@@ -6,7 +6,7 @@ My goal is to create approachable and simple solution that would help developers
 
 ## Get Started:
 
-'''python
+```python
 import pandas as pd
 from bysearch import Engine
 from bysearch.pipelines import HuggingFacePipeline, ONNXPipeline
@@ -30,4 +30,4 @@ engine = Engine(dataset=dataset, pipeline=pipeline, backend=backend)
 result = engine.search('аповесць беларускага пісьменніка Уладзіміра Караткевіча', verbose=False)
 print(result)
 print()
-'''
+```
