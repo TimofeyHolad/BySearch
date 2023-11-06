@@ -4,29 +4,27 @@ BySearch is a simple semantic search package that combine power of open source m
 
 My goal is to create approachable and simple solution that would help developers, who are not familiar with NLP models and technologies, to easily build and implement into their projects their mother tongue semantic search engines.  
 
-## Get Started:
+## Get Started
+
+BySearch combines different language models and different vector storages in a united simple semantic search API.
 
 ```python
 import pandas as pd
 from bysearch import Engine
-from bysearch.pipelines import HuggingFacePipeline, ONNXPipeline
-from bysearch.backends import DatasetBackend, PineconeBackend, ChromaBackend 
+from bysearch.pipelines import ONNXPipeline
+from bysearch.backends import ChromaBackend 
 
+# Open your data as Pandas DataFrame
 dataset = pd.DataFrame()
 dataset = dataset.add_column('id', list(range(len(dataset))))
-backend = ChromaBackend(
-    text_column_name='your_text_column_name', 
-    id_column_name='your_id_column_name', 
-    type='persistent', 
-    collection_name='your_collection_name'
-)
-pipeline = ONNXPipeline.from_hugging_face(
-    model='Hugging Face model path', 
-    onnx_save_path='local', 
-    max_context_length=127,
-    verbose=True,
-)
+# Create vector storage backend
+backend = DatasetBackend(text_column_name='your_text_column_name', id_column_name='yuor_id_column_name')
+# Create text processing pipeline
+pipeline = HuggingFacePipeline(model='Hugging Face model path')
+# Create engine using pipeline and backend, upsert your data
 engine = Engine(dataset=dataset, pipeline=pipeline, backend=backend)
-result = engine.search('аповесць беларускага пісьменніка Уладзіміра Караткевіча', verbose=False)
+# Perform search by your prompt
+result = engine.search('Your prompt', verbose=False)
 print(result)
 ```
+Other complex exemples are available [here](https://github.com/tiholad/BySearch/blob/main/demo%20EN.ipynb). 
