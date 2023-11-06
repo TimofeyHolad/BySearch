@@ -18,9 +18,9 @@ from bysearch.backends import ChromaBackend
 dataset = pd.DataFrame()
 dataset = dataset.add_column('id', list(range(len(dataset))))
 # Create vector storage backend
-backend = DatasetBackend(text_column_name='your_text_column_name', id_column_name='yuor_id_column_name')
+backend = DatasetBackend(text_column_name='your_text_column_name', id_column_name='id')
 # Create text processing pipeline
-pipeline = HuggingFacePipeline(model='Hugging Face model path')
+pipeline = HuggingFacePipeline(model='hugging_face_model_path')
 # Create engine using pipeline and backend, upsert your data
 engine = Engine(dataset=dataset, pipeline=pipeline, backend=backend)
 # Perform search by your prompt
